@@ -2,11 +2,18 @@
 #include "tankdrive.h"
 #include "indexer.h"
 #include "intake.h"
+#include "robotMap.h";
 
 using namespace vex;
 
 // A global instance of competition
 competition Competition;
+
+// Manager robot
+message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::manager);
+
+// Worker robot
+// message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::worker);
 
 // define your global instances of motors and other devices here
 tankDrive tank();
@@ -68,8 +75,7 @@ void usercontrol(void) {
     // Insert user code here. This is where you use the joystick values to
     // update your motors, etc.
     // ........................................................................
-
-    wait(20, msec); // Sleep the task for a short amount of time to
+    this_thread::sleep_for(20); // Sleep the task for a short amount of time to
                     // prevent wasted resources.
   }
 }
@@ -87,6 +93,7 @@ int main() {
 
   // Prevent main from exiting with an infinite loop.
   while (true) {
-    wait(100, msec);
+
+    this_thread::sleep_for(100);
   }
 }

@@ -1,5 +1,7 @@
 #include "vex.h"
 #include "tankdrive.h"
+#include "indexer.h"
+#include "intake.h"
 
 using namespace vex;
 
@@ -8,6 +10,8 @@ competition Competition;
 
 // define your global instances of motors and other devices here
 tankDrive tank();
+intake intake();
+indexer indexer();
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */

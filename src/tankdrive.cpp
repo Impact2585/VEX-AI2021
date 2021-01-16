@@ -1,5 +1,5 @@
 #include "vex.h"
-#include "robotMap.h";
+#include "robotMap.h"
 
 using namespace vex;
 
@@ -16,8 +16,4 @@ void move_left_side(double speed) {
 void move_right_side(double speed) {
   Motor_Right_1.setVelocity(speed, velocityUnits::rpm);
   Motor_Right_2.setVelocity(speed, velocityUnits::rpm);
-}
-
-int main() {
-  return 0; 
 }

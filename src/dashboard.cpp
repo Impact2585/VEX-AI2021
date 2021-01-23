@@ -91,56 +91,6 @@ dashboardJetson( int ox, int oy, int width, int height ) {
 }
 
 //
-// Display various useful information about VEXlink
-//
-static void
-dashboardVexlink( int ox, int oy, int width, int height ) {
-  static int32_t last_data = 0;
-  static int32_t last_packets = 0;
-  static int32_t total_data = 0;
-  static int32_t total_packets = 0;
-  static uint32_t update_time = 0;  
-
-  color darkred = vex::color(0x800000);
-  color darkgrn = vex::color(0x008000);
-
-  Brain.Screen.setClipRegion( ox, oy, width, height);
-  Brain.Screen.setFont( mono15 );
-
-  // border and titlebar
-  Brain.Screen.setPenColor( yellow );
-  Brain.Screen.drawRectangle(ox, oy, width, height, black );
-  Brain.Screen.drawRectangle( ox, oy, width, 20 );
-
-
-
-  oy += 20;
-
-
-
-
-
-  oy += 10;
-  Brain.Screen.printAt( ox + 10, oy += 15, "Location: local");
-  
-  float x,y,heading;
-
-  
-  Brain.Screen.printAt( ox + 10, oy += 15, " X:   %.2f", x);
-  Brain.Screen.printAt( ox + 10, oy += 15, " Y:   %.2f", y);
-  Brain.Screen.printAt( ox + 10, oy += 15, " H:   %.2f", heading);
-
-  oy += 5;
-  Brain.Screen.printAt( ox + 10, oy += 15, "Location: remote");
-  
-
-  
-  Brain.Screen.printAt( ox + 10, oy += 15, " X:   %.2f", x);
-  Brain.Screen.printAt( ox + 10, oy += 15, " Y:   %.2f", y);
-  Brain.Screen.printAt( ox + 10, oy += 15, " H:   %.2f", heading);
-}
-
-//
 // Task to update screen with status
 //
 int
@@ -148,7 +98,6 @@ dashboardTask() {
   while(true) {
     // status
     dashboardJetson(    0, 0, 280, 240 );
-    dashboardVexlink( 279, 0, 201, 240 );
     // draw, at 30Hz
     Brain.Screen.render();
     this_thread::sleep_for(16);

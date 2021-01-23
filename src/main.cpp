@@ -9,6 +9,9 @@ using namespace vex;
 // A global instance of competition
 competition Competition;
 
+// AI Jetson Nano
+ai::jetson  jetson_comms;
+
 // Manager robot
 message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::manager);
 
@@ -19,6 +22,8 @@ message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::manager);
 tankDrive tank();
 intake intake();
 indexer indexer();
+
+FILE *fp = fopen("/dev/serial2","wb");
 
 void pre_auton(void) {
   // Initializing Robot Configuration. DO NOT REMOVE!
@@ -32,17 +37,18 @@ void pre_auton(void) {
 
 void run(void) {
   // User control code here, inside the loop
-  while (1) {
-    // This is the main execution loop for the user control program.
-    // Each time through the loop your program should update motor + servo
-    // values based on feedback from the joysticks.
+  static MAP_RECORD local_map;
+  thread t1(dashboardTask);
 
-    // ........................................................................
-    // Insert user code here. This is where you use the joystick values to
-    // update your motors, etc.
-    // ........................................................................
-    this_thread::sleep_for(20); // Sleep the task for a short amount of time to
-                    // prevent wasted resources.
+  while (1) {
+
+    jetson_comms.get_data( &local_map );
+    fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az  );
+
+    // request new data        
+    jetson_comms.request_map();
+
+    this_thread::sleep_for(20);
   }
 }
 

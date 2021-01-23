@@ -139,7 +139,7 @@ namespace ai {
         static int    receive_task( void *arg );
 
         static  uint32_t _crc32_table[256];
-        static  uint32_t  crc32( uint8_t *pData, uint32_t numberOfBytes, uint32_t accumulator );
+        static  uint32_t  crc32( uint8_t *pData, uint32_t numberOfBytes, uint32_t accumulator);
     };
 };
 

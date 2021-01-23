@@ -15,6 +15,8 @@
 #include "v5.h"
 #include "v5_vcs.h"
 
+#include "ai_jetson.h"
+
 #include "robot-config.h"
 
 #define waitUntil(condition)                                                   \
@@ -24,3 +26,7 @@
 
 #define repeat(iterations)                                                     \
   for (int iterator = 0; iterator < iterations; iterator++)
+
+  extern ai::jetson    jetson_comms;
+  
+  extern int dashboardTask( void );

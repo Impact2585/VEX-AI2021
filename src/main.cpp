@@ -45,6 +45,10 @@ void run(void) {
     jetson_comms.get_data( &local_map );
     fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az  );
 
+    for(MAP_OBJECTS each: local_map.mapobj){
+      fprintf(fp, "%ld %ld %.2f %.2f %.2f", each.age, each.classID, each.p[0], each.p[1], each.p[2]);
+    }
+
     // request new data        
     jetson_comms.request_map();
 

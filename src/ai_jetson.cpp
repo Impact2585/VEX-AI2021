@@ -74,7 +74,7 @@ jetson::get_total() {
 int32_t
 jetson::get_data( MAP_RECORD *map ) {
     int32_t length = 0;
-
+    
     if( map != NULL ) {
         maplock.lock();
         memcpy( map, &last_map, sizeof(MAP_RECORD));

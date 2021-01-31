@@ -23,6 +23,9 @@ tankDrive tank();
 intake intake();
 indexer indexer();
 
+float targetX, targetY, targetAZ;
+bool targeting;
+
 FILE *fp = fopen("/dev/serial2","wb");
 
 void pre_auton(void) {
@@ -39,7 +42,9 @@ void run(void) {
   // User control code here, inside the loop
   static MAP_RECORD local_map;
   thread t1(dashboardTask);
-
+  targeting = false;
+  targetX = 0; targetY = 0; targetAZ = 0;
+  
   while (1) {
 
     jetson_comms.get_data( &local_map );
@@ -51,6 +56,10 @@ void run(void) {
 
     // request new data        
     jetson_comms.request_map();
+
+    if(targeting){
+      // Go from current position & heading to target position & heading
+    }
 
     this_thread::sleep_for(20);
   }

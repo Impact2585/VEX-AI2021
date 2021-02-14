@@ -38,13 +38,33 @@ void pre_auton(void) {
   return;
 }
 
+void play(void) {
+
+  // 1. Drive to the highway
+    // a. Turn to target heading
+
+
+    // b. Drive straight to the highway
+
+    // c. Turn to align with highway
+
+  // 2. Drive on the highway
+    // a. Follow the highway
+
+  // 3. Drive to the destination
+    // a. Turn to the target heading
+
+    // b. Drive straight to destination
+
+    // c. Turn to target heading
+}
+
 void run(void) {
   // User control code here, inside the loop
   static MAP_RECORD local_map;
   thread t1(dashboardTask);
-  targeting = false;
-  targetX = 0; targetY = 0; targetAZ = 0;
-  
+  thread t2(play);
+
   while (1) {
 
     jetson_comms.get_data( &local_map );
@@ -56,11 +76,6 @@ void run(void) {
 
     // request new data        
     jetson_comms.request_map();
-
-    if(targeting){
-      // Go from current position & heading to target position & heading
-    }
-
     this_thread::sleep_for(20);
   }
 }

@@ -1,5 +1,5 @@
 #include "vex.h"
-#include "tankdrive.h"
+#include "tankDrive.h"
 #include "indexer.h"
 #include "intake.h"
 #include "robotMap.h"
@@ -19,9 +19,9 @@ message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::manager);
 // message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::worker);
 
 // define your global instances of motors and other devices here
-tankDrive tank();
-intake intake();
-indexer indexer();
+tankDrive tank;
+intake intake;
+indexer indexer;
 
 float targetX, targetY, targetAZ;
 bool targeting;
@@ -39,7 +39,6 @@ void pre_auton(void) {
 }
 
 void play(void) {
-
   // 1. Drive to the highway
     // a. Turn to target heading
 

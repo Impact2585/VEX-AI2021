@@ -9,9 +9,12 @@ public:
   motor Motor_Left_2;
   motor Motor_Right_1;
   motor Motor_Right_2;
-  double TURNING_BUFFER;
+  double turn_kP;
+  double move_kP;
+  double BUFFER;
 
   tankDrive();
+
   void move_left_side(double);
   void move_right_side(double);
 
@@ -19,6 +22,7 @@ public:
   void left_turn(double);
   void right_turn(double);
 
-  void turn_to(double, double);
-  void move_to(double, double, double, double, double, double);
+  double turn_speed(double, double);
+  double move_speed(double, double);
+  bool move(double, double, double, double);
 };

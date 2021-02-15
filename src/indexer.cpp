@@ -1,10 +1,11 @@
 #include "vex.h"
+#include "indexer.h"
 #include "robotMap.h"
 
 using namespace vex;
 
-motor indexer_motor(INDEXER_MOTOR);
+indexer::indexer() : indexer_motor(INDEXER_MOTOR) {}
 
-void index(double speed) {
+void indexer::index(double speed) {
   indexer_motor.setVelocity(speed, velocityUnits::pct);
 }

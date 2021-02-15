@@ -1,10 +1,11 @@
 #include "vex.h"
+#include "intake.h"
 #include "robotMap.h"
 
 using namespace vex;
 
-motor intake_motor(INTAKE_MOTOR);
+intake::intake() : intake_motor(INTAKE_MOTOR){}
 
-void run_intake(double speed) {
+void intake::run_intake(double speed) {
   intake_motor.setVelocity(speed, velocityUnits::pct);
 }

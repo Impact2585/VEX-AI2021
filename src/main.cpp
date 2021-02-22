@@ -3,8 +3,13 @@
 #include "indexer.h"
 #include "intake.h"
 #include "robotMap.h"
+#include <cmath>
 
 using namespace vex;
+using namespace std;
+
+#define DISTANCE_BUFFER 1.0
+#define ANGLE_BUFFER 5.0
 
 // A global instance of competition
 competition Competition;
@@ -19,12 +24,13 @@ message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::manager);
 // message_link linkA(VEX_LINK, "VRC_2585VEGA_A", linkType::worker);
 
 // define your global instances of motors and other devices here
-tankDrive tank;
-intake intake;
-indexer indexer;
+static tankDrive tank;
+static intake intake;
+static indexer indexer;
 
 float targetX, targetY, targetAZ;
 bool targeting;
+
 
 FILE *fp = fopen("/dev/serial2","wb");
 
@@ -39,33 +45,12 @@ void pre_auton(void) {
 }
 
 void play(void) {
-  // 1. Drive to the highway
-    // a. Turn to target heading
-
-
-    // b. Drive straight to the highway
-
-    // c. Turn to align with highway
-
-  // 2. Drive on the highway
-    // a. Follow the highway
-
-  // 3. Drive to the destination
-    // a. Turn to the target heading
-
-    // b. Drive straight to destination
-
-    // c. Turn to target heading
-}
-
-void run(void) {
-  // User control code here, inside the loop
+  int phase = 1;
+  int highwaySeg = -1;
   static MAP_RECORD local_map;
-  thread t1(dashboardTask);
-  thread t2(play);
+  tuple<pair<double, double>, double> res = tuple<pair<double, double>, double> {pair<double,double>{0.0, 0.0}, 0.0};
 
-  while (1) {
-
+  while(1){
     jetson_comms.get_data( &local_map );
     fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az  );
 
@@ -75,8 +60,135 @@ void run(void) {
 
     // request new data        
     jetson_comms.request_map();
+
+    if(phase == 1 || phase == 2)
+      res = tank.highway(local_map.pos.x, local_map.pos.y);
+    else if (phase == 4 || phase == 6 || phase == 7)
+      res = tank.highway(local_map.pos.x, local_map.pos.y); // replace with method
+
+    switch(phase) {
+      case 1: { // Turn to target heading
+        if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
+          phase++;
+        }
+        break;
+      } case 2: { // Drive straight to highway
+        int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
+        int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
+        if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
+          phase++;
+        }
+        break;
+      } case 3: { // Turn to align with highway. Determine which leg of the highway we are on
+                  // 1 = moving north, 2 = moving east, 3 = moving south, 4 = moving west
+        if(abs(local_map.pos.x - -18) < DISTANCE_BUFFER){
+          if(tank.move(0, 0, local_map.pos.az, 0)){
+            phase++;
+            highwaySeg = 1;
+          }
+        }
+        if(abs(local_map.pos.y - 18) < DISTANCE_BUFFER){
+          if(tank.move(0, 0, local_map.pos.az, 90)){
+            phase++;
+            highwaySeg = 2;
+          }
+        }
+        if(abs(local_map.pos.x - 18) < DISTANCE_BUFFER){
+          if(tank.move(0, 0, local_map.pos.az, 180)){
+            phase++;
+            highwaySeg = 3;
+          }
+        }
+        if(abs(local_map.pos.y - -18) < DISTANCE_BUFFER){
+          if(tank.move(0, 0, local_map.pos.az, 270)){
+            phase++;
+            highwaySeg = 4;
+          }
+        }
+        break;
+      } case 4: { // Drive until corner
+        if(abs(local_map.pos.x - get<0>(res).first) < DISTANCE_BUFFER && abs(local_map.pos.y - get<0>(res).second) < DISTANCE_BUFFER){
+          highwaySeg = -1;
+          phase += 2;
+        }
+
+        switch(highwaySeg){
+          case 1:
+            if(tank.move(local_map.pos.y, 18, local_map.pos.az, 0)){
+              phase++;
+            }
+            break;
+          case 2:
+            if(tank.move(local_map.pos.x, 18, local_map.pos.az, 90)){
+              phase++;
+            }
+            break;
+          case 3:
+            if(tank.move(local_map.pos.y, -18, local_map.pos.az, 180)){
+              phase++;
+            }
+            break;
+          case 4:
+            if(tank.move(local_map.pos.x, -18, local_map.pos.az, 270)){
+              phase++;
+            }
+            break;
+        }
+        break;
+      } case 5: { // Turn right
+        switch(highwaySeg){
+          case 1:
+            if(tank.move(0, 0, local_map.pos.az, 90)){
+              phase--;
+              highwaySeg++;
+            }
+            break;
+          case 2:
+            if(tank.move(0, 0, local_map.pos.az, 180)){
+              phase--;
+              highwaySeg++;
+            }
+            break;
+          case 3:
+            if(tank.move(0, 0, local_map.pos.az, 270)){
+              phase--;
+              highwaySeg++;
+            }
+            break;
+          case 4:
+            if(tank.move(0, 0, local_map.pos.az, 0)){
+              phase--;
+              highwaySeg = 1;
+            }
+            break;
+        }
+        break;
+       } case 6: { // Turn to target heading
+        if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
+          phase++;
+        }
+        break; 
+      } case 7: { // Drive straight to destination
+        int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
+        int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
+        // to-do: replace target location
+        if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
+          phase++;
+        }
+        break;
+      } case 8: { // Turn to target heading
+        break;
+      }
+    }
+
     this_thread::sleep_for(20);
   }
+}
+
+void run(void) {
+  // User control code here, inside the loop
+  thread t1(dashboardTask);
+  thread t2(play);
 }
 
 // Demo message sender in message_link

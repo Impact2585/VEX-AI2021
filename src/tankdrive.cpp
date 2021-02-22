@@ -6,9 +6,12 @@
 using namespace vex;
 using namespace std;
 
+#define PI 3.14159265
+#define DISTANCE_BUFFER 1.0
+#define TURNING_BUFFER 5.0
+
 double turn_kP = 1.0; // TO-DO: Tune kP
 double move_kP = 1.0; // TO-DO: Tune kP
-double BUFFER = 5.0;
 
 tankDrive::tankDrive() : Motor_Left_1(LEFT_MOTOR1), Motor_Left_2(LEFT_MOTOR2), Motor_Right_1(RIGHT_MOTOR1), Motor_Right_2(RIGHT_MOTOR2) {}
 
@@ -65,5 +68,74 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   move_left_side(power + turn);
   move_right_side(power - turn);
 
-  return (abs(targetDist - dist) + abs(targetHeading - heading)) > BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
+  return abs(targetDist - dist) > DISTANCE_BUFFER && abs(targetHeading - heading) > TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
+}
+
+tuple<pair<double, double>, double> closestJoinHighway(int x, int y){
+  double newX;
+  double newY;
+  double a;
+
+  if (x < -18){
+    if (y < -18){
+      newX = -18;
+      newY = -18;
+      a = -(atan2 (-18-x, -18-y) * 180 / PI)+90;
+    } else if (-18 <= y && y <= 18){
+      newX = -18;
+      newY = y;
+      a = 90;
+    } else if (y > 18){
+       newX = -18;
+       newY = 18;
+       a = -(atan2 (-18-x, 18-y) * 180 / PI)+90;
+    }
+  } else if (-18 <= x && x<= 18){
+    if (y < -18){
+      newX = x;
+      newY = -18;
+      a = 0;
+    } else if (-18 <= y && y<= 18){
+      if ((y > x && x > 0) || (y > -x && x < 0)){
+        newX = x;
+        newY = 18;
+        a = 0;
+      } else if ((y < x && x > 0) || (y > - x && x > 0)){
+        newX = 18;
+        newY = y;
+        a = 90;
+      } else if ((y < -x && x > 0) || (y<x && x < 0)){
+        newX = x;
+        newY = -18;
+        a = 180;
+      } else if ((y > x && x < 0) || (y < -x && x < 0)){
+        newX = -18;
+        newY = y;
+        a = 270;
+      }
+    } else if (y> 18){
+      newX = x;
+      newY = 18;
+      a = 180;
+    }
+  } else if (x > 18){
+     if (y < -18){
+      newX = 18;
+      newY = -18;
+      a = -(atan2 (18-x, -18-y) * 180 / PI)+90;
+    } else if (-18 <= y && y<= 18){
+      newX = 18;
+      newY = y;
+      a = 270;
+    } else if (y> 18){
+      newX = 18;
+      newY = 18;
+      a = -(atan2 (18-x, 18-y) * 180 / PI) + 90;
+    }
+  }
+  return tuple<pair<double, double>, double> {pair<double,double>{newX, newY}, a};
+}
+
+tuple<pair<double, double>, double> closestLeaveHighway(int targetX, int targetY){
+  return closestJoinHighway(targetX, targetY);
 }

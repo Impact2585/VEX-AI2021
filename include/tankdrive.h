@@ -2,6 +2,7 @@
 #include "vex.h"
 
 using namespace vex;
+using namespace std;
 
 class tankDrive{
 public:
@@ -11,7 +12,6 @@ public:
   motor Motor_Right_2;
   double turn_kP;
   double move_kP;
-  double BUFFER;
 
   tankDrive();
 
@@ -25,4 +25,7 @@ public:
   double turn_speed(double, double);
   double move_speed(double, double);
   bool move(double, double, double, double);
+
+  tuple<pair<double, double>, double> closestJoinHighway(double, double);
+  tuple<pair<double, double>, double> closestLeaveHighway(double, double);
 };

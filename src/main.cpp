@@ -30,6 +30,9 @@ static indexer indexer;
 
 float targetX, targetY, targetAZ;
 bool targeting;
+int phase = 1;
+int drivePhase = 1;
+int highwaySeg = -1;
 
 
 FILE *fp = fopen("/dev/serial2","wb");
@@ -44,9 +47,133 @@ void pre_auton(void) {
   return;
 }
 
+bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res, int targetAZ){
+  switch(drivePhase) {
+    case 1: { // Turn to target heading
+      if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
+        drivePhase++;
+      }
+      break;
+    } case 2: { // Drive straight to highway
+      int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
+      int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
+      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
+        drivePhase++;
+      }
+      break;
+    } case 3: { // Turn to align with highway. Determine which leg of the highway we are on
+                // 1 = moving north, 2 = moving east, 3 = moving south, 4 = moving west
+      if(abs(local_map.pos.x - -18) < DISTANCE_BUFFER){
+        if(tank.move(0, 0, local_map.pos.az, 0)){
+          drivePhase++;
+          highwaySeg = 1;
+        }
+      }
+      if(abs(local_map.pos.y - 18) < DISTANCE_BUFFER){
+        if(tank.move(0, 0, local_map.pos.az, 90)){
+          drivePhase++;
+          highwaySeg = 2;
+        }
+      }
+      if(abs(local_map.pos.x - 18) < DISTANCE_BUFFER){
+        if(tank.move(0, 0, local_map.pos.az, 180)){
+          drivePhase++;
+          highwaySeg = 3;
+        }
+      }
+      if(abs(local_map.pos.y - -18) < DISTANCE_BUFFER){
+        if(tank.move(0, 0, local_map.pos.az, 270)){
+          drivePhase++;
+          highwaySeg = 4;
+        }
+      }
+      break;
+    } case 4: { // Drive until corner
+      if(abs(local_map.pos.x - get<0>(res).first) < DISTANCE_BUFFER && abs(local_map.pos.y - get<0>(res).second) < DISTANCE_BUFFER){
+        highwaySeg = -1;
+        drivePhase += 2;
+      }
+
+      switch(highwaySeg){
+        case 1:
+          if(tank.move(local_map.pos.y, 18, local_map.pos.az, 0)){
+            drivePhase++;
+          }
+          break;
+        case 2:
+          if(tank.move(local_map.pos.x, 18, local_map.pos.az, 90)){
+            drivePhase++;
+          }
+          break;
+        case 3:
+          if(tank.move(local_map.pos.y, -18, local_map.pos.az, 180)){
+            drivePhase++;
+          }
+          break;
+        case 4:
+          if(tank.move(local_map.pos.x, -18, local_map.pos.az, 270)){
+            drivePhase++;
+          }
+          break;
+      }
+      break;
+    } case 5: { // Turn right
+      switch(highwaySeg){
+        case 1:
+          if(tank.move(0, 0, local_map.pos.az, 90)){
+            drivePhase--;
+            highwaySeg++;
+          }
+          break;
+        case 2:
+          if(tank.move(0, 0, local_map.pos.az, 180)){
+            drivePhase--;
+            highwaySeg++;
+          }
+          break;
+        case 3:
+          if(tank.move(0, 0, local_map.pos.az, 270)){
+            drivePhase--;
+            highwaySeg++;
+          }
+          break;
+        case 4:
+          if(tank.move(0, 0, local_map.pos.az, 0)){
+            drivePhase--;
+            highwaySeg = 1;
+          }
+          break;
+      }
+      break;
+    } case 6: { // Turn to target heading
+      if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
+        drivePhase++;
+      }
+      break; 
+    } case 7: { // Drive straight to destination
+      int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
+      int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
+      // to-do: replace target location
+      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
+        drivePhase++;
+      }
+      break;
+    } case 8: { // Turn to target heading
+      if(tank.move(0, 0, local_map.pos.az, targetAZ)){
+        drivePhase++;
+      }
+      break;
+    } case 9: {
+      return true;
+      break;
+    }
+  }
+
+  return false;
+}
+
+
 void play(void) {
-  int phase = 1;
-  int highwaySeg = -1;
   static MAP_RECORD local_map;
   tuple<pair<double, double>, double> res = tuple<pair<double, double>, double> {pair<double,double>{0.0, 0.0}, 0.0};
 
@@ -60,123 +187,44 @@ void play(void) {
 
     // request new data        
     jetson_comms.request_map();
-
-    if(phase == 1 || phase == 2)
-      res = tank.highway(local_map.pos.x, local_map.pos.y);
-    else if (phase == 4 || phase == 6 || phase == 7)
-      res = tank.highway(local_map.pos.x, local_map.pos.y); // replace with method
-
-    switch(phase) {
-      case 1: { // Turn to target heading
-        if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
-          phase++;
-        }
+    float targetX; float targetY; float targetAZ;
+    
+    switch(phase){
+      case 1: { // find ball
+        // set targetX, targetY, targetAZ
+        // when successful, increment phase
+        // NO WHILE LOOPS ALLOWED
         break;
-      } case 2: { // Drive straight to highway
-        int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
-        int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
-        if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
-          phase++;
-        }
-        break;
-      } case 3: { // Turn to align with highway. Determine which leg of the highway we are on
-                  // 1 = moving north, 2 = moving east, 3 = moving south, 4 = moving west
-        if(abs(local_map.pos.x - -18) < DISTANCE_BUFFER){
-          if(tank.move(0, 0, local_map.pos.az, 0)){
-            phase++;
-            highwaySeg = 1;
-          }
-        }
-        if(abs(local_map.pos.y - 18) < DISTANCE_BUFFER){
-          if(tank.move(0, 0, local_map.pos.az, 90)){
-            phase++;
-            highwaySeg = 2;
-          }
-        }
-        if(abs(local_map.pos.x - 18) < DISTANCE_BUFFER){
-          if(tank.move(0, 0, local_map.pos.az, 180)){
-            phase++;
-            highwaySeg = 3;
-          }
-        }
-        if(abs(local_map.pos.y - -18) < DISTANCE_BUFFER){
-          if(tank.move(0, 0, local_map.pos.az, 270)){
-            phase++;
-            highwaySeg = 4;
-          }
-        }
-        break;
-      } case 4: { // Drive until corner
-        if(abs(local_map.pos.x - get<0>(res).first) < DISTANCE_BUFFER && abs(local_map.pos.y - get<0>(res).second) < DISTANCE_BUFFER){
-          highwaySeg = -1;
-          phase += 2;
+      } case 2: { // drive to ball
+        if(drivePhase == 1 || drivePhase == 2)
+          res = tank.closestJoinHighway(local_map.pos.x, local_map.pos.y);
+        else if (drivePhase == 4 || drivePhase == 6 || drivePhase == 7)
+          res = tank.closestLeaveHighway(targetX, targetY); // target location
+        
+        if(drive(local_map, res, targetAZ)){
+          drivePhase = 1; phase++;
         }
 
-        switch(highwaySeg){
-          case 1:
-            if(tank.move(local_map.pos.y, 18, local_map.pos.az, 0)){
-              phase++;
-            }
-            break;
-          case 2:
-            if(tank.move(local_map.pos.x, 18, local_map.pos.az, 90)){
-              phase++;
-            }
-            break;
-          case 3:
-            if(tank.move(local_map.pos.y, -18, local_map.pos.az, 180)){
-              phase++;
-            }
-            break;
-          case 4:
-            if(tank.move(local_map.pos.x, -18, local_map.pos.az, 270)){
-              phase++;
-            }
-            break;
-        }
         break;
-      } case 5: { // Turn right
-        switch(highwaySeg){
-          case 1:
-            if(tank.move(0, 0, local_map.pos.az, 90)){
-              phase--;
-              highwaySeg++;
-            }
-            break;
-          case 2:
-            if(tank.move(0, 0, local_map.pos.az, 180)){
-              phase--;
-              highwaySeg++;
-            }
-            break;
-          case 3:
-            if(tank.move(0, 0, local_map.pos.az, 270)){
-              phase--;
-              highwaySeg++;
-            }
-            break;
-          case 4:
-            if(tank.move(0, 0, local_map.pos.az, 0)){
-              phase--;
-              highwaySeg = 1;
-            }
-            break;
-        }
+      } case 3: { // intake ball
+
         break;
-       } case 6: { // Turn to target heading
-        if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
-          phase++;
+      } case 4: { // find goal
+        // set targetX, targetY, targetAZ
+        // when successful, increment phase
+      } case 5: { // drive to goal
+
+        if(drivePhase == 1 || drivePhase == 2)
+          res = tank.closestJoinHighway(local_map.pos.x, local_map.pos.y);
+        else if (drivePhase == 4 || drivePhase == 6 || drivePhase == 7)
+          res = tank.closestLeaveHighway(targetX, targetY); // target location
+        
+        if(drive(local_map, res, targetAZ)){
+          drivePhase = 1; phase++;
         }
-        break; 
-      } case 7: { // Drive straight to destination
-        int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
-        int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
-        // to-do: replace target location
-        if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
-          phase++;
-        }
+
         break;
-      } case 8: { // Turn to target heading
+      } case 6: { // deposit ball
         break;
       }
     }

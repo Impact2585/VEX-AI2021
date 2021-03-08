@@ -71,7 +71,7 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   return abs(targetDist - dist) > DISTANCE_BUFFER && abs(targetHeading - heading) > TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
 }
 
-tuple<pair<double, double>, double> closestJoinHighway(int x, int y){
+tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){
   double newX;
   double newY;
   double a;
@@ -136,6 +136,6 @@ tuple<pair<double, double>, double> closestJoinHighway(int x, int y){
   return tuple<pair<double, double>, double> {pair<double,double>{newX, newY}, a};
 }
 
-tuple<pair<double, double>, double> closestLeaveHighway(int targetX, int targetY){
+tuple<pair<double, double>, double> tankDrive::closestLeaveHighway(double targetX, double targetY){
   return closestJoinHighway(targetX, targetY);
 }

@@ -16,6 +16,7 @@
 #include "v5_vcs.h"
 
 #include "ai_jetson.h"
+#include "ai_robot_link.h"
 
 #include "robot-config.h"
 
@@ -28,5 +29,6 @@
   for (int iterator = 0; iterator < iterations; iterator++)
 
 extern ai::jetson      jetson_comms;
+extern ai::robot_link  link; 
 
 extern int dashboardTask( void );

@@ -25,34 +25,47 @@ extern "C" {
 
 #define	MAX_OBJECT		50		// Maximum number of detected objects
 
+
+/// This structure represents a visual detection of a VEX object from the forward facing depth camera.
+/// These objects are in refference to the video image frame 
 typedef struct {
-	int32_t		x, y;			      // The center position of this object where 0,0 is the upper left
+	int32_t		x, y;			      // The center position of this object where 0,0 is the upper left. Max X = 320. Max Y = 240
 	int32_t		width, height;	// The width and height of the bounding box of this object
-	int32_t		classID;		    // The class id of this object
-	float	    depth;			    // The depth of this object
-	float	    prob;		  	    // The probability that this object is in this class
+	int32_t		classID;		    // The class id of this object (0 = Red 1 = Blue 2 = Goal)
+	float	    depth;			    // The depth of this object in mm from the camera
+	float	    prob;		  	    // The probability that this object is in this class (1.0 == 100%)
 } fifo_object_box;
 
+/// This structure represents a the robots location in refference to the center of the playing field
 typedef struct {
-	int32_t		framecnt;
-	int32_t		status;
-	float	    x, y, z;
-	float	    az, el, rot;
+	int32_t		framecnt;       // This counter increments each frame
+	int32_t		status;         // 0 = All Good, != 0 = Not All Good
+	float	    x, y, z;        // X,Y,Z field coordinates in millimeters. Position 0,0 is in the middle of the field.
+                            // Z is mm from the field tiles.
+                            // NOTE: These coordinates are for the GPS sensor (FLIR Camera) If you want to know the location of the 
+                            // center of your robot you will have add an offset. 
+	float	    az;             // Rotation of the robot in radians (Heading)
+  float     el;             // Elevation of the robot in radians (Pitch)
+  float     rot;            // Rotation/Tilt of the robot in radians (Roll)
 } POS_RECORD;
 
+/// This structure represents a visual detection of a VEX object from the forward facing depth camera.
+/// These objects are in refference to the playing field.
 typedef struct {
 	int32_t		age;		        // The number of iterations since the last valid measurement
 	int32_t		classID;	      // The class ID of the object  0: red,  1: blue
-	float	    p[3];		        // Position
+  float     positionX;      // X position field coordinates in millimeters. Position 0,0 is in the middle of the field.
+  float     positionY;      // Y position field coordinates in millimeters. Position 0,0 is in the middle of the field.
+  float     positionZ;      // Z position field coordinates in millimeters. Z represents height above the field tiles.
 } MAP_OBJECTS;
 
 // The MAP_RECORD contains everything
 typedef struct {
-	int32_t					  boxnum;
-	int32_t					  mapnum;
-	POS_RECORD			  pos;
-	fifo_object_box		boxobj[MAX_OBJECT];
-	MAP_OBJECTS			  mapobj[MAX_OBJECT];
+	int32_t					  boxnum;     // Number of objects in the boxobj array
+	int32_t					  mapnum;     // Number of objects in the mapobj array 
+	POS_RECORD			  pos;        // Position record for the robots position
+	fifo_object_box		boxobj[MAX_OBJECT];     // Detected image objects
+	MAP_OBJECTS			  mapobj[MAX_OBJECT];     // Detected map objects
 } MAP_RECORD;
 
 #define	MAP_POS_SIZE	(2 * sizeof(int32_t) + sizeof(POS_RECORD))
@@ -139,7 +152,7 @@ namespace ai {
         static int    receive_task( void *arg );
 
         static  uint32_t _crc32_table[256];
-        static  uint32_t  crc32( uint8_t *pData, uint32_t numberOfBytes, uint32_t accumulator);
+        static  uint32_t  crc32( uint8_t *pData, uint32_t numberOfBytes, uint32_t accumulator );
     };
 };
 

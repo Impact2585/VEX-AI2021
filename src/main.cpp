@@ -10,7 +10,12 @@ using namespace std;
 
 #define DISTANCE_BUFFER 1.0
 #define ANGLE_BUFFER 5.0
-#define STOP_BEFORE 12.0 // 
+#define STOP_BEFORE 12.0
+#define GOAL_CONST_BEFORE 24.0
+#define GOAL_CONST 34.0
+
+// 0 is red team, 1 is blue team. Change and restart before matches
+#define TEAM_COLOR 1
 
 // A global instance of competition
 competition Competition;
@@ -190,12 +195,16 @@ void play(void) {
         for (int i = 0; i<360/camRange; i++){
 
           for(MAP_OBJECTS each: local_map.mapobj){
-            float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
-            // Find X and Y coordinates that give smallest distance
-            if (dist < bestDist){
-              bestX = each.positionX;
-              bestY = each.positionY;
-              bestDist = dist;
+            if(each.classID == TEAM_COLOR){
+              if((abs(each.positionX - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX) < DISTANCE_BUFFER) && (abs(each.positionY - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY) < DISTANCE_BUFFER)){
+                float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
+                // Find X and Y coordinates that give smallest distance
+                if (dist < bestDist){
+                  bestX = each.positionX;
+                  bestY = each.positionY;
+                  bestDist = dist;
+                }
+              }
             }
           }
           // Rotate 60 degrees to the next reference frame
@@ -238,15 +247,15 @@ void play(void) {
         // set targetX, targetY
         // when successful, increment phase
         if(curGoal == 0){
-          targetX = -24; targetY = 24;
+          targetX = -GOAL_CONST_BEFORE; targetY = GOAL_CONST_BEFORE;
         } else if (curGoal == 1){
-          targetX = -24; targetY = 0;
+          targetX = -GOAL_CONST_BEFORE; targetY = 0;
         } else if (curGoal == 2){
-          targetX = -24; targetY = -24;
+          targetX = -GOAL_CONST_BEFORE; targetY = -GOAL_CONST_BEFORE;
         } else if (curGoal == 3){
-          targetX = 0; targetY = -24;
+          targetX = 0; targetY = -GOAL_CONST_BEFORE;
         } else if (curGoal == 4){
-          targetX = 24; targetY = -24;
+          targetX = GOAL_CONST_BEFORE; targetY = -GOAL_CONST_BEFORE;
         }
 
         phase++;
@@ -368,7 +377,7 @@ int main() {
         // set our location to be sent to partner robot
         link.set_remote_location( local_map.pos.x, local_map.pos.y, local_map.pos.az );
 
-        //fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az  );
+        fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az  );
 
         // request new data    
         // NOTE: This request should only happen in a single task.    

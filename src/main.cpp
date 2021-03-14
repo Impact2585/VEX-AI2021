@@ -159,11 +159,8 @@ bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res){
       int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
       int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
       if(tank.move(0, sqrt(changeX * changeX + changeY * changeY) - STOP_BEFORE, local_map.pos.az, get<1>(res))){
-        drivePhase++;
+        return true;
       }
-      break;
-    } case 8: {
-      return true;
       break;
     }
   }
@@ -176,15 +173,11 @@ void play(void) {
   tuple<pair<double, double>, double> res = tuple<pair<double, double>, double> {pair<double,double>{0.0, 0.0}, 0.0};
 
   while(1){
-    jetson_comms.get_data( &local_map );
     fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az);
 
     for(MAP_OBJECTS each: local_map.mapobj){
       fprintf(fp, "%ld %ld %.2f %.2f %.2f", each.age, each.classID, each.positionX, each.positionY, each.positionZ);
     }
-
-    // request new data        
-    jetson_comms.request_map();
     
     switch(phase){
       case 1: { // find ball
@@ -195,7 +188,6 @@ void play(void) {
         float roboY = local_map.pos.y;
         float bestDist = 100;
         for (int i = 0; i<360/camRange; i++){
-          jetson_comms.get_data( &local_map);
 
           for(MAP_OBJECTS each: local_map.mapobj){
             float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
@@ -209,8 +201,6 @@ void play(void) {
           // Rotate 60 degrees to the next reference frame
           float targetAZ = local_map.pos.az + camRange;
           while(!tank.move(0, 0, local_map.pos.az, targetAZ)){}
-
-          jetson_comms.request_map();
         }
         targetX = bestX;
         targetY = bestY;

@@ -47,6 +47,11 @@ int curGoal = 0;
 int32_t loop_time = 66;
 static MAP_RECORD local_map;
 static vector<MAP_OBJECTS> ballsInGoal;
+tuple<float, float> redIsolation [] = {tuple<float, float>(-1,1), tuple<float, float>(-1,0), tuple<float,float>(-1,-1)};
+tuple<float, float> redInteraction [] = {tuple<float, float>(-1,1), tuple<float, float>(-1,0), tuple<float,float>(-1,-1), tuple<float, float>(0,-1), tuple<float, float>(1,-1)};
+tuple<float, float> blueIsolation [] = {tuple<float, float>(1,1), tuple<float, float>(1,0), tuple<float,float>(1,-1)};
+tuple<float, float> blueInteraction [] = {tuple<float, float>(1,1), tuple<float, float>(1,0), tuple<float,float>(1,-1), tuple<float, float>(-1,1), tuple<float, float>(0,1)};
+
 
 FILE *fp = fopen("/dev/serial2","wb");
 
@@ -204,13 +209,16 @@ void play(bool isolation) {
 
           for(MAP_OBJECTS each: local_map.mapobj){
             if(each.classID == TEAM_COLOR){
-              if((abs(each.positionX - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX) < DISTANCE_BUFFER) && (abs(each.positionY - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY) < DISTANCE_BUFFER)){
-                float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
-                // Find X and Y coordinates that give smallest distance
-                if (dist < bestDist){
-                  bestX = each.positionX;
-                  bestY = each.positionY;
-                  bestDist = dist;
+              if (!isolation || (TEAM_COLOR == 0 && each.positionX < 0) || (TEAM_COLOR == 1 && each.positionX > 0))
+              {
+                if((abs(each.positionX - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX) < DISTANCE_BUFFER) && (abs(each.positionY - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY) < DISTANCE_BUFFER)){
+                  float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
+                  // Find X and Y coordinates that give smallest distance
+                  if (dist < bestDist){
+                    bestX = each.positionX;
+                    bestY = each.positionY;
+                    bestDist = dist;
+                  }
                 }
               }
             }
@@ -254,22 +262,42 @@ void play(bool isolation) {
       } case 4: { // find goal
         // set targetX, targetY
         // when successful, increment phase
-        if(curGoal == 0){
-          targetX = -GOAL_CONST_BEFORE; targetY = GOAL_CONST_BEFORE;
-        } else if (curGoal == 1){
-          targetX = -GOAL_CONST_BEFORE; targetY = 0;
-        } else if (curGoal == 2){
-          targetX = -GOAL_CONST_BEFORE; targetY = -GOAL_CONST_BEFORE;
-        } else if (curGoal == 3){
-          targetX = 0; targetY = -GOAL_CONST_BEFORE;
-        } else if (curGoal == 4){
-          targetX = GOAL_CONST_BEFORE; targetY = -GOAL_CONST_BEFORE;
-        }
+        if (TEAM_COLOR == 0){
+          if (isolation){
+            targetX = get<0>(redIsolation[curGoal])*GOAL_CONST_BEFORE;
+            targetY = get<1>(redIsolation[curGoal])*GOAL_CONST_BEFORE;
 
+            if (curGoal == 2){
+              curGoal = -1;
+            }
+          }else{
+            targetX = get<0>(redInteraction[curGoal])*GOAL_CONST_BEFORE;
+            targetY = get<1>(redInteraction[curGoal])*GOAL_CONST_BEFORE;
+
+            if (curGoal == 4){
+              curGoal = -1;
+            }
+          }
+        }else{
+          if (isolation){
+            targetX = get<0>(blueIsolation[curGoal])*GOAL_CONST_BEFORE;
+            targetY = get<1>(blueIsolation[curGoal])*GOAL_CONST_BEFORE;
+
+            if (curGoal == 2){
+              curGoal = -1;
+            }
+          }else{
+            targetX = get<0>(blueInteraction[curGoal])*GOAL_CONST_BEFORE;
+            targetY = get<1>(blueInteraction[curGoal])*GOAL_CONST_BEFORE;
+
+            if (curGoal == 4){
+              curGoal = -1;
+            }
+          }
+        }
+        
         phase++;
         curGoal++;
-        if(curGoal == 5)
-          curGoal = 0;
       } case 5: { // drive to goal
 
         if(drivePhase == 1 || drivePhase == 2)
@@ -285,7 +313,7 @@ void play(bool isolation) {
       } case 6: { // deposit ball
         ballsInGoal.clear();
         for(MAP_OBJECTS each: local_map.mapobj){
-          if((abs(each.positionX - curGoal.x) < DISTANCE_BUFFER && abs(each.positionY - curGoal.y) < DISTANCE_BUFFER){
+          if((abs(each.positionX - targetX * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER && abs(each.positionY - targetY * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER)){
             ballsInGoal.push_back(each);
           }
         }

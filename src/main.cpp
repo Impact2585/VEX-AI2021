@@ -4,6 +4,8 @@
 #include "intake.h"
 #include "robotMap.h"
 #include <cmath>
+#include <vector>
+#include <algorithm>
 
 using namespace vex;
 using namespace std;
@@ -44,6 +46,7 @@ int highwaySeg = -1;
 int curGoal = 0;
 int32_t loop_time = 66;
 static MAP_RECORD local_map;
+static vector<MAP_OBJECTS> ballsInGoal;
 
 FILE *fp = fopen("/dev/serial2","wb");
 
@@ -56,6 +59,11 @@ void pre_auton(void) {
 
   return;
 }
+
+bool orderByHeight (MAP_OBJECTS i, MAP_OBJECTS j) {
+  return i.positionZ < j.positionZ;
+}
+
 
 bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res){
   switch(drivePhase) {
@@ -174,7 +182,7 @@ bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res){
 }
 
 
-void play(void) {
+void play(bool isolation) {
   tuple<pair<double, double>, double> res = tuple<pair<double, double>, double> {pair<double,double>{0.0, 0.0}, 0.0};
 
   while(1){
@@ -275,6 +283,16 @@ void play(void) {
 
         break;
       } case 6: { // deposit ball
+        ballsInGoal.clear();
+        for(MAP_OBJECTS each: local_map.mapobj){
+          if((abs(each.positionX - curGoal.x) < DISTANCE_BUFFER && abs(each.positionY - curGoal.y) < DISTANCE_BUFFER){
+            ballsInGoal.push_back(each);
+          }
+        }
+        sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
+
+        printf("%d", ballsInGoal.size());
+
         tank.move_left_side(50);
         tank.move_right_side(50);
 
@@ -282,7 +300,8 @@ void play(void) {
 
         tank.move_left_side(0);
         tank.move_right_side(0);
-        intake.run_intake(50);
+        if(ballsInGoal.size() == 3)
+          intake.run_intake(50);
         indexer.index(50);
 
         this_thread::sleep_for(500);
@@ -296,7 +315,19 @@ void play(void) {
 
         tank.move_left_side(0);
         tank.move_right_side(0);
-        phase = 1;
+
+        if(ballsInGoal.size() == 3){
+          if(ballsInGoal[0].classID == TEAM_COLOR){
+            phase = 4;
+          } else {
+            indexer.index(50);
+            this_thread::sleep_for(1000);
+            indexer.index(0);
+            phase = 1;
+          }
+        } else {
+          phase = 1;
+        }
         break;
       }
     }
@@ -325,11 +356,11 @@ void play(void) {
 // }
 
 void auto_Isolation(void) {
-  // TO-DO
+  play(true);
 }
 
 void auto_Interaction(void) {
-  play();
+  play(false);
 }
 
 bool firstAutoFlag = true;

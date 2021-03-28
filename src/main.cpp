@@ -24,9 +24,9 @@ competition Competition;
 
 // AI Jetson Nano
 ai::jetson  jetson_comms;
-#define  MANAGER_ROBOT    1
+bool manager_robot = true;
 
-#if defined(MANAGER_ROBOT)
+#if manager_robot
 #pragma message("building for the manager")
 ai::robot_link       link( PORT11, "robot_32456_1", linkType::manager );
 #else
@@ -168,6 +168,7 @@ bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res){
           break;
       }
       break;
+      // If it has not reached the target location yet, repeat steps 4-5
     } case 6: { // Turn to target heading
       if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
         drivePhase++;
@@ -318,7 +319,6 @@ void play(bool isolation) {
           }
         }
         sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-
         printf("%d", ballsInGoal.size());
 
         tank.move_left_side(50);
@@ -384,6 +384,13 @@ void play(bool isolation) {
 // }
 
 void auto_Isolation(void) {
+  tank.move_left_side(50);
+  tank.move_right_side(50);
+  
+  this_thread::sleep_for(1000);
+
+  tank.move_left_side(0);
+  tank.move_right_side(0);
   play(true);
 }
 

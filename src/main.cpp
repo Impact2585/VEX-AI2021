@@ -15,16 +15,17 @@ using namespace std;
 #define STOP_BEFORE 12.0
 #define GOAL_CONST_BEFORE 24.0
 #define GOAL_CONST 34.0
+#define X_MARKS_SPOT 18.0
 
-// 0 is red team, 1 is blue team. Change and restart before matches
+// 0 is red team, 1 is blue team. Change and restart before matches. Also change manager_robot
 #define TEAM_COLOR 1
+#define manager_robot true
 
 // A global instance of competition
 competition Competition;
 
 // AI Jetson Nano
 ai::jetson  jetson_comms;
-bool manager_robot = true;
 
 #if manager_robot
 #pragma message("building for the manager")
@@ -39,19 +40,17 @@ static tankDrive tank;
 static intake intake;
 static indexer indexer;
 
-float targetX = 0.0, targetY = 0.0;
+float targetX = 0.0, targetY = 0.0, targetAZ = 315;
 int phase = 1;
 int drivePhase = 1;
-int highwaySeg = -1;
-int curGoal = 0;
 int32_t loop_time = 66;
 static MAP_RECORD local_map;
-static vector<MAP_OBJECTS> ballsInGoal;
-tuple<float, float> redIsolation [] = {tuple<float, float>(-1,1), tuple<float, float>(-1,0), tuple<float,float>(-1,-1)};
-tuple<float, float> redInteraction [] = {tuple<float, float>(-1,1), tuple<float, float>(-1,0), tuple<float,float>(-1,-1), tuple<float, float>(0,-1), tuple<float, float>(1,-1)};
-tuple<float, float> blueIsolation [] = {tuple<float, float>(1,1), tuple<float, float>(1,0), tuple<float,float>(1,-1)};
-tuple<float, float> blueInteraction [] = {tuple<float, float>(1,1), tuple<float, float>(1,0), tuple<float,float>(1,-1), tuple<float, float>(-1,1), tuple<float, float>(0,1)};
 
+int goalY = (manager_robot) ? 1 : -1;
+
+tuple<float, float> redIsolation [] = {tuple<float, float>(-1,goalY)};
+tuple<float, float> blueIsolation [] = {tuple<float, float>(1,goalY)};
+tuple<float, float> interaction [] = {tuple<float, float>(-1,goalY), tuple<float, float>(1, goalY)};
 
 FILE *fp = fopen("/dev/serial2","wb");
 
@@ -70,117 +69,25 @@ bool orderByHeight (MAP_OBJECTS i, MAP_OBJECTS j) {
 }
 
 
-bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res){
+bool drive(MAP_RECORD local_map, double tAZ, double tX, double tY){
   switch(drivePhase) {
     case 1: { // Turn to target heading
-      if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
+      if(tank.move(0, 0, local_map.pos.az, tAZ)){
         drivePhase++;
       }
       break;
-    } case 2: { // Drive straight to highway
-      int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
-      int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
-      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, get<1>(res))){
+    } case 2: { // Drive straight to target
+      int changeX = max(tX, (double)local_map.pos.x) - min(tX, (double)local_map.pos.x);
+      int changeY = max(tY, (double)local_map.pos.y) - min(tY, (double)local_map.pos.y);
+      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, tAZ)){
         drivePhase++;
       }
       break;
-    } case 3: { // Turn to align with highway. Determine which leg of the highway we are on
-                // 1 = moving north, 2 = moving east, 3 = moving south, 4 = moving west
-      if(abs(local_map.pos.x - -18) < DISTANCE_BUFFER){
-        if(tank.move(0, 0, local_map.pos.az, 0)){
-          drivePhase++;
-          highwaySeg = 1;
-        }
-      }
-      if(abs(local_map.pos.y - 18) < DISTANCE_BUFFER){
-        if(tank.move(0, 0, local_map.pos.az, 90)){
-          drivePhase++;
-          highwaySeg = 2;
-        }
-      }
-      if(abs(local_map.pos.x - 18) < DISTANCE_BUFFER){
-        if(tank.move(0, 0, local_map.pos.az, 180)){
-          drivePhase++;
-          highwaySeg = 3;
-        }
-      }
-      if(abs(local_map.pos.y - -18) < DISTANCE_BUFFER){
-        if(tank.move(0, 0, local_map.pos.az, 270)){
-          drivePhase++;
-          highwaySeg = 4;
-        }
-      }
-      break;
-    } case 4: { // Drive until corner
-      if(abs(local_map.pos.x - get<0>(res).first) < DISTANCE_BUFFER && abs(local_map.pos.y - get<0>(res).second) < DISTANCE_BUFFER){
-        highwaySeg = -1;
-        drivePhase += 2;
-      }
-
-      switch(highwaySeg){
-        case 1:
-          if(tank.move(local_map.pos.y, 18, local_map.pos.az, 0)){
-            drivePhase++;
-          }
-          break;
-        case 2:
-          if(tank.move(local_map.pos.x, 18, local_map.pos.az, 90)){
-            drivePhase++;
-          }
-          break;
-        case 3:
-          if(tank.move(local_map.pos.y, -18, local_map.pos.az, 180)){
-            drivePhase++;
-          }
-          break;
-        case 4:
-          if(tank.move(local_map.pos.x, -18, local_map.pos.az, 270)){
-            drivePhase++;
-          }
-          break;
-      }
-      break;
-    } case 5: { // Turn right
-      switch(highwaySeg){
-        case 1:
-          if(tank.move(0, 0, local_map.pos.az, 90)){
-            drivePhase--;
-            highwaySeg++;
-          }
-          break;
-        case 2:
-          if(tank.move(0, 0, local_map.pos.az, 180)){
-            drivePhase--;
-            highwaySeg++;
-          }
-          break;
-        case 3:
-          if(tank.move(0, 0, local_map.pos.az, 270)){
-            drivePhase--;
-            highwaySeg++;
-          }
-          break;
-        case 4:
-          if(tank.move(0, 0, local_map.pos.az, 0)){
-            drivePhase--;
-            highwaySeg = 1;
-          }
-          break;
-      }
-      break;
-      // If it has not reached the target location yet, repeat steps 4-5
-    } case 6: { // Turn to target heading
-      if(tank.move(0, 0, local_map.pos.az, get<1>(res))){
-        drivePhase++;
-      }
-      break; 
-    } case 7: { // Drive straight to destination
-      int changeX = max(get<0>(res).first, (double)local_map.pos.x) - min(get<0>(res).first, (double)local_map.pos.x);
-      int changeY = max(get<0>(res).second, (double)local_map.pos.y) - min(get<0>(res).second, (double)local_map.pos.y);
-      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY) - STOP_BEFORE, local_map.pos.az, get<1>(res))){
+    } case 3: { // Turn to final target heading
+      if(tank.move(0, 0, local_map.pos.az, tAZ)){
         return true;
       }
-      break;
+      break; 
     }
   }
 
@@ -189,8 +96,6 @@ bool drive(MAP_RECORD local_map, tuple<pair<double, double>, double> res){
 
 
 void play(bool isolation) {
-  tuple<pair<double, double>, double> res = tuple<pair<double, double>, double> {pair<double,double>{0.0, 0.0}, 0.0};
-
   while(1){
     fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az);
 
@@ -210,8 +115,16 @@ void play(bool isolation) {
 
           for(MAP_OBJECTS each: local_map.mapobj){
             if(each.classID == TEAM_COLOR){
-              if (!isolation || (TEAM_COLOR == 0 && each.positionX < 0) || (TEAM_COLOR == 1 && each.positionX > 0))
-              {
+              if ((isolation && (
+                   (TEAM_COLOR == 0 && manager_robot && each.positionX < 0 && each.positionY > 0)
+                || (TEAM_COLOR == 1 && manager_robot && each.positionX > 0 && each.positionY > 0) 
+                || (TEAM_COLOR == 0 && !manager_robot && each.positionX < 0 && each.positionY < 0)
+                || (TEAM_COLOR == 1 && !manager_robot && each.positionX > 0 && each.positionY < 0)))
+              || (!isolation && (
+                   (TEAM_COLOR == 0 && manager_robot && each.positionY > 0) 
+                || (TEAM_COLOR == 1 && manager_robot && each.positionY > 0) 
+                || (TEAM_COLOR == 0 && !manager_robot && each.positionY < 0) 
+                || (TEAM_COLOR == 1 && !manager_robot && each.positionY < 0)))){
                 if((abs(each.positionX - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX) < DISTANCE_BUFFER) && (abs(each.positionY - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY) < DISTANCE_BUFFER)){
                   float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
                   // Find X and Y coordinates that give smallest distance
@@ -225,20 +138,17 @@ void play(bool isolation) {
             }
           }
           // Rotate 60 degrees to the next reference frame
-          float targetAZ = local_map.pos.az + camRange;
-          while(!tank.move(0, 0, local_map.pos.az, targetAZ)){}
+          float ang = local_map.pos.az + camRange;
+          while(!tank.move(0, 0, local_map.pos.az, ang)){
+            this_thread::sleep_for(loop_time);
+          }
         }
         targetX = bestX;
         targetY = bestY;
         phase++;
         break;
       } case 2: { // drive to ball
-        if(drivePhase == 1 || drivePhase == 2)
-          res = tank.closestJoinHighway(local_map.pos.x, local_map.pos.y);
-        else if (drivePhase == 4 || drivePhase == 6 || drivePhase == 7)
-          res = tank.closestLeaveHighway(targetX, targetY); // target location
-        
-        if(drive(local_map, res)){
+        if(drive(local_map, targetX, targetY, tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY))){
           drivePhase = 1; phase++;
         }
 
@@ -264,57 +174,37 @@ void play(bool isolation) {
         // set targetX, targetY
         // when successful, increment phase
         if (TEAM_COLOR == 0){
-          if (isolation){
-            targetX = get<0>(redIsolation[curGoal])*GOAL_CONST_BEFORE;
-            targetY = get<1>(redIsolation[curGoal])*GOAL_CONST_BEFORE;
-
-            if (curGoal == 2){
-              curGoal = -1;
-            }
-          }else{
-            targetX = get<0>(redInteraction[curGoal])*GOAL_CONST_BEFORE;
-            targetY = get<1>(redInteraction[curGoal])*GOAL_CONST_BEFORE;
-
-            if (curGoal == 4){
-              curGoal = -1;
-            }
-          }
+          targetX = get<0>(redIsolation[0])*X_MARKS_SPOT;
+          targetY = get<1>(redIsolation[0])*X_MARKS_SPOT;
+          targetAZ += 90;
         }else{
-          if (isolation){
-            targetX = get<0>(blueIsolation[curGoal])*GOAL_CONST_BEFORE;
-            targetY = get<1>(blueIsolation[curGoal])*GOAL_CONST_BEFORE;
-
-            if (curGoal == 2){
-              curGoal = -1;
-            }
-          }else{
-            targetX = get<0>(blueInteraction[curGoal])*GOAL_CONST_BEFORE;
-            targetY = get<1>(blueInteraction[curGoal])*GOAL_CONST_BEFORE;
-
-            if (curGoal == 4){
-              curGoal = -1;
-            }
-          }
+          targetX = get<0>(blueIsolation[0])*X_MARKS_SPOT;
+          targetY = get<1>(blueIsolation[0])*X_MARKS_SPOT;
+          targetAZ += 90;
         }
-        
-        phase++;
-        curGoal++;
-      } case 5: { // drive to goal
 
+        if (targetAZ >= 360){
+          targetAZ -= 360;
+        }
+
+        phase++;
+      } case 5: { // drive to goal
+        double angle;
         if(drivePhase == 1 || drivePhase == 2)
-          res = tank.closestJoinHighway(local_map.pos.x, local_map.pos.y);
-        else if (drivePhase == 4 || drivePhase == 6 || drivePhase == 7)
-          res = tank.closestLeaveHighway(targetX, targetY); // target location
+          angle = tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY);
+        else
+          angle = targetAZ; // target location
         
-        if(drive(local_map, res)){
+        if(drive(local_map, targetX, targetY, angle)){
           drivePhase = 1; phase++;
         }
 
         break;
       } case 6: { // deposit ball
-        ballsInGoal.clear();
+        vector<MAP_OBJECTS> ballsInGoal;
+        // Rewrite
         for(MAP_OBJECTS each: local_map.mapobj){
-          if((abs(each.positionX - targetX * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER && abs(each.positionY - targetY * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER)){
+          if(each.classID != 2 && (abs(each.positionX - targetX * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER && abs(each.positionY - targetY * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER)){
             ballsInGoal.push_back(each);
           }
         }

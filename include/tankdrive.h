@@ -28,4 +28,7 @@ public:
 
   tuple<pair<double, double>, double> closestJoinHighway(double, double);
   tuple<pair<double, double>, double> closestLeaveHighway(double, double);
+
+  double angleBetween(double, double, double, double);
+
 };

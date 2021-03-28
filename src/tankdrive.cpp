@@ -139,3 +139,13 @@ tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, doub
 tuple<pair<double, double>, double> tankDrive::closestLeaveHighway(double targetX, double targetY){
   return closestJoinHighway(targetX, targetY);
 }
+
+double tankDrive::angleBetween(double x, double y, double tX, double tY){
+  double angle = atan2(tX - x, tY - y);
+  if(tY - y < 0){
+    angle += 180; 
+  }
+  if(angle < 0)
+  angle += 360;
+  return angle;
+}

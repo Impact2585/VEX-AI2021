@@ -16,10 +16,10 @@ using namespace std;
 #define GOAL_CONST 34.0
 #define X_MARKS_SPOT 18.0
 
-// 0 is red team, 1 is blue team. Change and restart before matches.
+// 0 is red team, 1 is blue team. Change the program run during competition for rounds. 1 = red team, 2 = blue team
 #define TEAM_COLOR 1
-// This is the manager robot. THE MANAGER ROBOT IS ALWAYS PLACED TO THE NORTH OF THE WORKER ROBOT.
-#define manager_robot true
+// This is the worker robot. THE WORKER ROBOT IS ALWAYS PLACED TO THE SOUTH OF THE MANAGER ROBOT.
+#define manager_robot false
 
 // A global instance of competition
 competition Competition;
@@ -28,7 +28,7 @@ competition Competition;
 ai::jetson  jetson_comms;
 
 // #pragma message("building for the manager")
-ai::robot_link       link( PORT11, "robot_32456_1", linkType::manager );
+ai::robot_link       link( VEX_LINK, "robot_32456_1", linkType::worker );
 
 // define your global instances of motors and other devices here
 static tankDrive tank;
@@ -40,15 +40,7 @@ int drivePhase = 1;
 int32_t loop_time = 66;
 static MAP_RECORD local_map;
 
-tuple<float, float> redIsolation [] = {tuple<float, float>(-1,1)};
-tuple<float, float> blueIsolation [] = {tuple<float, float>(1,1)};
-tuple<float, float> interaction [] = {tuple<float, float>(-1,1), tuple<float, float>(1, 1)};
-
 FILE *fp = fopen("/dev/serial2","wb");
-
-bool orderByHeight (MAP_OBJECTS i, MAP_OBJECTS j) {
-  return i.positionZ < j.positionZ;
-}
 
 bool drive(MAP_RECORD local_map, double tAZ, double tX, double tY){
   switch(drivePhase) {
@@ -154,19 +146,14 @@ void play(bool isolation) {
         // set targetX, targetY
         // when successful, increment phase
         if (TEAM_COLOR == 0) {
-          targetX = get<0>(redIsolation[0])*X_MARKS_SPOT;
-          targetY = get<1>(redIsolation[0])*X_MARKS_SPOT;
-          targetAZ += 90;
+          targetX = -X_MARKS_SPOT;
+          targetY = 0;
+          targetAZ = 0;
         } else {
-          targetX = get<0>(blueIsolation[0])*X_MARKS_SPOT;
-          targetY = get<1>(blueIsolation[0])*X_MARKS_SPOT;
-          targetAZ += 90;
+          targetX = X_MARKS_SPOT;
+          targetY = 0;
+          targetAZ = 0;
         }
-
-        if (targetAZ >= 360){
-          targetAZ -= 360;
-        }
-
         phase++;
       } case 5: { // drive to goal
         double angle;
@@ -180,52 +167,22 @@ void play(bool isolation) {
         }
 
         break;
-      } case 6: { // deposit ball
-        vector<MAP_OBJECTS> ballsInGoal;
-        // Rewrite
-        for(MAP_OBJECTS each: local_map.mapobj){
-          if(each.classID != 2 && (abs(each.positionX - targetX * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER && abs(each.positionY - targetY * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER)){
-            ballsInGoal.push_back(each);
-          }
-        }
-        sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-        // fprintf(fp, "%d", ballsInGoal.size());
+      } case 6: { // spit out ball
 
         tank.drive(50, 0);
-        this_thread::sleep_for(1000);
-
+        this_thread::sleep_for(500);
         tank.drive(0, 0);
-        if(ballsInGoal.size() == 3){
-          ballStor.intake(50);
-          this_thread::sleep_for(750);
-        }
 
-        ballStor.intake(0);
-        ballStor.shoot(50);
+        ballStor.intake(-50);
 
         this_thread::sleep_for(500);
 
-        ballStor.shoot(0);
-        tank.move_left_side(-50);
-        tank.move_right_side(-50);
+        ballStor.intake(0);
+        tank.drive(-50, 0);
 
         this_thread::sleep_for(1000);
 
-        tank.move_left_side(0);
-        tank.move_right_side(0);
-
-        if(ballsInGoal.size() == 3){
-          if(ballsInGoal[0].classID == TEAM_COLOR){
-            phase = 4;
-          } else {
-            ballStor.shoot(50);
-            this_thread::sleep_for(1000);
-            ballStor.shoot(0);
-            phase = 1;
-          }
-        } else {
-          phase = 1;
-        }
+        tank.drive(0, 0);
         break;
       }
     }
@@ -293,13 +250,7 @@ int main() {
   // thread t1(dashboardTask);
   // Competition.autonomous(autonomousMain);
   // linkA.received("demoMessage", receiveDemo);
-  left_drive.spin(directionType::fwd, 50, percentUnits::pct);
-  right_drive.spin(directionType::fwd, 50, percentUnits::pct);
-  this_thread::sleep_for(500);
-  left_drive.spin(directionType::fwd, 0, percentUnits::pct);
-  right_drive.spin(directionType::fwd, 0, percentUnits::pct);
   
-
   // Prevent main from exiting with an infinite loop.
   // print through the controller to the terminal (vexos 1.0.12 is needed)
     // As USB is tied up with Jetson communications we cannot use

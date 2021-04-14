@@ -1,7 +1,6 @@
 #include "vex.h"
 #include "tankDrive.h"
-#include "indexer.h"
-#include "intake.h"
+#include "ballStorage.h"
 #include "robotMap.h"
 #include <cmath>
 #include <vector>
@@ -17,8 +16,9 @@ using namespace std;
 #define GOAL_CONST 34.0
 #define X_MARKS_SPOT 18.0
 
-// 0 is red team, 1 is blue team. Change and restart before matches. Also change manager_robot
+// 0 is red team, 1 is blue team. Change and restart before matches.
 #define TEAM_COLOR 1
+// This is the manager robot. THE MANAGER ROBOT IS ALWAYS PLACED TO THE NORTH OF THE WORKER ROBOT.
 #define manager_robot true
 
 // A global instance of competition
@@ -27,18 +27,12 @@ competition Competition;
 // AI Jetson Nano
 ai::jetson  jetson_comms;
 
-#if manager_robot
-#pragma message("building for the manager")
+// #pragma message("building for the manager")
 ai::robot_link       link( PORT11, "robot_32456_1", linkType::manager );
-#else
-#pragma message("building for the worker")
-ai::robot_link       link( PORT11, "robot_32456_1", linkType::worker );
-#endif
 
 // define your global instances of motors and other devices here
 static tankDrive tank;
-static intake intake;
-static indexer indexer;
+static ballStorage ballStor;
 
 float targetX = 0.0, targetY = 0.0, targetAZ = 315;
 int phase = 1;
@@ -46,28 +40,15 @@ int drivePhase = 1;
 int32_t loop_time = 66;
 static MAP_RECORD local_map;
 
-int goalY = (manager_robot) ? 1 : -1;
-
-tuple<float, float> redIsolation [] = {tuple<float, float>(-1,goalY)};
-tuple<float, float> blueIsolation [] = {tuple<float, float>(1,goalY)};
-tuple<float, float> interaction [] = {tuple<float, float>(-1,goalY), tuple<float, float>(1, goalY)};
+tuple<float, float> redIsolation [] = {tuple<float, float>(-1,1)};
+tuple<float, float> blueIsolation [] = {tuple<float, float>(1,1)};
+tuple<float, float> interaction [] = {tuple<float, float>(-1,1), tuple<float, float>(1, 1)};
 
 FILE *fp = fopen("/dev/serial2","wb");
-
-void pre_auton(void) {
-  // Initializing Robot Configuration. DO NOT REMOVE!
-  vexcodeInit();
-
-  // All activities that occur before the competition starts
-  // Example: clearing encoders, setting servo positions, ...
-
-  return;
-}
 
 bool orderByHeight (MAP_OBJECTS i, MAP_OBJECTS j) {
   return i.positionZ < j.positionZ;
 }
-
 
 bool drive(MAP_RECORD local_map, double tAZ, double tX, double tY){
   switch(drivePhase) {
@@ -97,11 +78,13 @@ bool drive(MAP_RECORD local_map, double tAZ, double tX, double tY){
 
 void play(bool isolation) {
   while(1){
+    fprintf(fp, "ROBOT LOCATION: " );
     fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az);
-
+    fprintf(fp, "MAP OBJECTS: \n");
     for(MAP_OBJECTS each: local_map.mapobj){
       fprintf(fp, "%ld %ld %.2f %.2f %.2f", each.age, each.classID, each.positionX, each.positionY, each.positionZ);
     }
+    fprintf(fp, "\n");
     
     switch(phase){
       case 1: { // find ball
@@ -111,7 +94,7 @@ void play(bool isolation) {
         float roboX = local_map.pos.x;
         float roboY = local_map.pos.y;
         float bestDist = 100;
-        for (int i = 0; i<360/camRange; i++){
+        for (int i = 0; i<360/camRange; i+=camRange){
 
           for(MAP_OBJECTS each: local_map.mapobj){
             if(each.classID == TEAM_COLOR){
@@ -154,30 +137,27 @@ void play(bool isolation) {
 
         break;
       } case 3: { // intake ball
-        intake.run_intake(50);
-        tank.move_left_side(50);
-        tank.move_right_side(50);
+        ballStor.intake(50);
+        tank.drive(50, 0);
 
         this_thread::sleep_for(2000);
 
-        intake.run_intake(0);
-        tank.move_left_side(-50);
-        tank.move_right_side(-50);
+        ballStor.intake(0);
+        tank.drive(-50, 0);
         
         this_thread::sleep_for(2000);
 
-        tank.move_left_side(0);
-        tank.move_right_side(0);
+        tank.drive(0, 0);
         phase++;
         break;
       } case 4: { // find goal
         // set targetX, targetY
         // when successful, increment phase
-        if (TEAM_COLOR == 0){
+        if (TEAM_COLOR == 0) {
           targetX = get<0>(redIsolation[0])*X_MARKS_SPOT;
           targetY = get<1>(redIsolation[0])*X_MARKS_SPOT;
           targetAZ += 90;
-        }else{
+        } else {
           targetX = get<0>(blueIsolation[0])*X_MARKS_SPOT;
           targetY = get<1>(blueIsolation[0])*X_MARKS_SPOT;
           targetAZ += 90;
@@ -209,23 +189,23 @@ void play(bool isolation) {
           }
         }
         sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-        printf("%d", ballsInGoal.size());
+        // fprintf(fp, "%d", ballsInGoal.size());
 
-        tank.move_left_side(50);
-        tank.move_right_side(50);
-
+        tank.drive(50, 0);
         this_thread::sleep_for(1000);
 
-        tank.move_left_side(0);
-        tank.move_right_side(0);
-        if(ballsInGoal.size() == 3)
-          intake.run_intake(50);
-        indexer.index(50);
+        tank.drive(0, 0);
+        if(ballsInGoal.size() == 3){
+          ballStor.intake(50);
+          this_thread::sleep_for(750);
+        }
+
+        ballStor.intake(0);
+        ballStor.shoot(50);
 
         this_thread::sleep_for(500);
 
-        intake.run_intake(0);
-        indexer.index(0);
+        ballStor.shoot(0);
         tank.move_left_side(-50);
         tank.move_right_side(-50);
 
@@ -238,9 +218,9 @@ void play(bool isolation) {
           if(ballsInGoal[0].classID == TEAM_COLOR){
             phase = 4;
           } else {
-            indexer.index(50);
+            ballStor.shoot(50);
             this_thread::sleep_for(1000);
-            indexer.index(0);
+            ballStor.shoot(0);
             phase = 1;
           }
         } else {
@@ -274,13 +254,11 @@ void play(bool isolation) {
 // }
 
 void auto_Isolation(void) {
-  tank.move_left_side(50);
-  tank.move_right_side(50);
+  tank.drive(50, 0);
   
   this_thread::sleep_for(1000);
 
-  tank.move_left_side(0);
-  tank.move_right_side(0);
+  tank.drive(0, 0);
   play(true);
 }
 
@@ -310,12 +288,17 @@ void autonomousMain(void) {
 // Main will set up the competition functions and callbacks.
 //
 int main() {
-  thread t1(dashboardTask);
-  Competition.autonomous(autonomousMain);
-  // linkA.received("demoMessage", receiveDemo);
+  vexcodeInit();
 
-  // Run the pre-autonomous function.
-  pre_auton();
+  // thread t1(dashboardTask);
+  // Competition.autonomous(autonomousMain);
+  // linkA.received("demoMessage", receiveDemo);
+  left_drive.spin(directionType::fwd, 50, percentUnits::pct);
+  right_drive.spin(directionType::fwd, 50, percentUnits::pct);
+  this_thread::sleep_for(500);
+  left_drive.spin(directionType::fwd, 0, percentUnits::pct);
+  right_drive.spin(directionType::fwd, 0, percentUnits::pct);
+  
 
   // Prevent main from exiting with an infinite loop.
   // print through the controller to the terminal (vexos 1.0.12 is needed)
@@ -324,16 +307,13 @@ int main() {
     // then this can be used as a direct connection to USB on the controller
     // when using VEXcode.
     //
-    //FILE *fp = fopen("/dev/serial2","wb");
 
     while(1) {
         // get last map data
         jetson_comms.get_data( &local_map );
 
         // set our location to be sent to partner robot
-        link.set_remote_location( local_map.pos.x, local_map.pos.y, local_map.pos.az );
-
-        fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az  );
+        // link.set_remote_location( local_map.pos.x, local_map.pos.y, local_map.pos.az );
 
         // request new data    
         // NOTE: This request should only happen in a single task.    

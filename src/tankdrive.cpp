@@ -13,32 +13,19 @@ using namespace std;
 double turn_kP = 1.0; // TO-DO: Tune kP
 double move_kP = 1.0; // TO-DO: Tune kP
 
-tankDrive::tankDrive() : Motor_Left_1(LEFT_MOTOR1), Motor_Left_2(LEFT_MOTOR2), Motor_Right_1(RIGHT_MOTOR1), Motor_Right_2(RIGHT_MOTOR2) {}
+tankDrive::tankDrive(){}
 
 void tankDrive::move_left_side(double speed) {
-  Motor_Left_1.setVelocity(speed, velocityUnits::pct);
-  Motor_Left_2.setVelocity(speed, velocityUnits::pct);
+  left_drive.spin(directionType::fwd, speed, percentUnits::pct);
 }
 
 void tankDrive::move_right_side(double speed) {
-  Motor_Right_1.setVelocity(speed, velocityUnits::pct);
-  Motor_Right_2.setVelocity(speed, velocityUnits::pct);
+  right_drive.spin(directionType::fwd, speed, percentUnits::pct);
 }
 
-void tankDrive::left_turn(double speed){
-  Motor_Left_1.setVelocity(-speed, velocityUnits::pct);
-  Motor_Left_2.setVelocity(-speed, velocityUnits::pct);
-
-  Motor_Right_1.setVelocity(speed, velocityUnits::pct);
-  Motor_Right_2.setVelocity(speed, velocityUnits::pct);
-}
-
-void tankDrive::right_turn(double speed){
-  Motor_Left_1.setVelocity(speed, velocityUnits::pct);
-  Motor_Left_2.setVelocity(speed, velocityUnits::pct);
-
-  Motor_Right_1.setVelocity(-speed, velocityUnits::pct);
-  Motor_Right_2.setVelocity(-speed, velocityUnits::pct);
+void tankDrive::drive(double speed, double turn){
+  move_left_side(speed + turn);
+  move_right_side(speed - turn);
 }
 
 double tankDrive::turn_speed(double heading, double target){ // Returns the motor speed adjustment based on turning
@@ -65,8 +52,7 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   double power = move_speed(dist, targetDist);
   double turn = turn_speed(heading, targetHeading);
 
-  move_left_side(power + turn);
-  move_right_side(power - turn);
+  drive(power, turn);
 
   return abs(targetDist - dist) > DISTANCE_BUFFER && abs(targetHeading - heading) > TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
 }

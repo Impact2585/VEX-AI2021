@@ -21,7 +21,7 @@ public:
   // Turning is in units of degrees
   double turn_speed(double, double);
   double move_speed(double, double);
-  bool move(double, double, double, double);
+  bool move(double, double, double, double, double);
 
   tuple<pair<double, double>, double> closestJoinHighway(double, double);
   tuple<pair<double, double>, double> closestLeaveHighway(double, double);

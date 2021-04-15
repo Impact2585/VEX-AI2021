@@ -7,11 +7,13 @@ using namespace vex;
 using namespace std;
 
 #define PI 3.14159265
-#define DISTANCE_BUFFER 1.0
-#define TURNING_BUFFER 5.0
+#define DISTANCE_BUFFER 3.0
+#define TURNING_BUFFER 3.0
 
-double turn_kP = 1.0; // TO-DO: Tune kP
-double move_kP = 1.0; // TO-DO: Tune kP
+#define turn_kP 0.3 // TO-DO: Tune kP
+#define move_kP 0.5 // TO-DO: Tune kP
+
+FILE *fpp = fopen("/dev/serial2","wb");
 
 tankDrive::tankDrive(){}
 
@@ -24,8 +26,8 @@ void tankDrive::move_right_side(double speed) {
 }
 
 void tankDrive::drive(double speed, double turn){
-  move_left_side(speed + turn);
-  move_right_side(speed - turn);
+  move_left_side(speed - turn);
+  move_right_side(speed + turn);
 }
 
 double tankDrive::turn_speed(double heading, double target){ // Returns the motor speed adjustment based on turning
@@ -45,16 +47,24 @@ double tankDrive::turn_speed(double heading, double target){ // Returns the moto
 
 double tankDrive::move_speed(double dist, double target){ // Returns the motor speed
   double error = target - dist;
-  return min(error * move_kP, 100.0);
+  return max(-100.0, min(error * move_kP, 100.0));
 }
 
-bool tankDrive::move(double dist, double targetDist, double heading, double targetHeading){
+bool tankDrive::move(double dist, double targetDist, double heading, double targetHeading, double speedMultiplier){
+    // fprintf(fpp, "%.2f %.2f\n", heading, targetHeading);
+
+  if(heading < 0)
+    heading += 360;
+  if(targetHeading < 0)
+    targetHeading += 360;
+  
   double power = move_speed(dist, targetDist);
   double turn = turn_speed(heading, targetHeading);
+  
+  // fprintf(fpp, "%.2f %.2f\n", heading, targetHeading);
+  drive(power * speedMultiplier, turn * speedMultiplier);
 
-  drive(power, turn);
-
-  return abs(targetDist - dist) > DISTANCE_BUFFER && abs(targetHeading - heading) > TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
+  return abs(targetDist - dist) < DISTANCE_BUFFER && abs(targetHeading - heading) < TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
 }
 
 tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){
@@ -127,7 +137,7 @@ tuple<pair<double, double>, double> tankDrive::closestLeaveHighway(double target
 }
 
 double tankDrive::angleBetween(double x, double y, double tX, double tY){
-  double angle = atan2(tX - x, tY - y);
+  double angle = (atan2(tY - y, tX - x)) * 180 / M_PI;
   if(tY - y < 0){
     angle += 180; 
   }

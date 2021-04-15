@@ -86,20 +86,12 @@ jetson::get_data( MAP_RECORD *map ) {
     map->pos.y /= 25.4;
     map->pos.z /= 25.4;
 
+    map->pos.x += -2.5 * cos(map->pos.az) + 8 * cos(M_PI/2.0 - map->pos.az);
+    map->pos.y += 2.5 * sin(map->pos.az) + 8 * sin(M_PI/2.0 - map->pos.az);
+
     map->pos.az = map->pos.az / (M_PI) * 180;
     map->pos.el = map->pos.el / (M_PI) * 180;
     map->pos.rot = map->pos.rot / (M_PI) * 180;
-
-    for(fifo_object_box each: map->boxobj){
-      each.depth /= 25.4;
-    }
-
-    for(MAP_OBJECTS each: map->mapobj){
-      each.positionX /= 25.4;
-      each.positionY /= 25.4;
-      each.positionZ /= 25.4;
-    }
-
     return length;
 }
 

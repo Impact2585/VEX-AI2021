@@ -9,16 +9,13 @@
 using namespace vex;
 using namespace std;
 
-#define DISTANCE_BUFFER 3.0
-#define ANGLE_BUFFER 3.0
 #define STOP_BEFORE 12.0
-#define GOAL_CONST_BEFORE 58.0
 #define GOAL_CONST 68.0
-#define X_MARKS_SPOT 36.0
 
 // 0 is red team, 1 is blue team. Change the program run during competition for rounds. 1 = red team, 2 = blue team
 #define TEAM_COLOR 0
-// This is the manager robot. THE MANAGER ROBOT IS ALWAYS PLACED TO THE NORTH OF THE WORKER ROBOT.
+// This is the manager robot. THE MANAGER ROBOT IS  PLACED TO THE NORTH OF THE WORKER ROBOT 
+// ON THE RED TEAM, AND SOUTH OF THE WORKER ROBOT ON THE BLUE TEAM.
 #define manager_robot true
 
 // A global instance of competition
@@ -34,217 +31,126 @@ ai::robot_link       link( VEX_LINK, "robot_32456_1", linkType::manager );
 static tankDrive tank;
 static ballStorage ballStor;
 
-float targetX = 0.0, targetY = 0.0, targetAZ = 315;
-int phase = 1;
-int drivePhase = 1;
 int32_t loop_time = 66;
 static MAP_RECORD local_map;
 
-tuple<float, float> redIsolation [] = {tuple<float, float>(-1,1)};
-tuple<float, float> blueIsolation [] = {tuple<float, float>(1,1)};
-tuple<float, float> interaction [] = {tuple<float, float>(-1,1), tuple<float, float>(1, 1)};
-
 FILE *fp = fopen("/dev/serial2","wb");
 
-bool orderByHeight (MAP_OBJECTS i, MAP_OBJECTS j) {
-  return i.positionZ < j.positionZ;
+bool orderByHeight (fifo_object_box i, fifo_object_box j) {
+  return i.y > j.y;
 }
 
-bool drive(MAP_RECORD local_map, double tX, double tY, double tAZ){
-  switch(drivePhase) {
-    case 1: { // Turn to target heading
-      if(tank.move(0, 0, local_map.pos.az, tAZ, 0.5)){
-        fprintf(fp, "T1: %.2f %.2f\n", local_map.pos.az, tAZ);
-        drivePhase++;
-      }
-      break;
-    } case 2: { // Drive straight to target
-      double changeX = max(tX, (double)local_map.pos.x) - min(tX, (double)local_map.pos.x);
-      double changeY = max(tY, (double)local_map.pos.y) - min(tY, (double)local_map.pos.y);
-      fprintf(fp, "%.2f %.2f\n", changeX, changeY);
-      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, tAZ, 0.5)){
-        drivePhase++;
-        fprintf(fp, "T2");
-      }
-      break;
-    } case 3: { // Turn to final target heading
-      if(tank.move(0, 0, local_map.pos.az, tAZ, 1)){
-        fprintf(fp, "T3");
-        return true;
-      }
-      break; 
+double dist(double ax, double ay, double bx, double by){
+  return sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+}
+
+void score(){
+  tank.drive(20, 0);
+  this_thread::sleep_for(1000);
+  tank.drive(0, 0);
+  ballStor.shoot(100);
+  this_thread::sleep_for(1000);
+  ballStor.shoot(0);
+  tank.drive(-20, 0);
+  this_thread::sleep_for(1000);
+  tank.drive(0, 0);
+}
+
+void intake(){
+  tank.drive(20, 0);
+  this_thread::sleep_for(1000);
+  tank.drive(0, 0);
+  ballStor.intake(100);
+  this_thread::sleep_for(1000);
+  ballStor.intake(0);
+  tank.drive(-20, 0);
+  this_thread::sleep_for(1000);
+  tank.drive(0, 0);
+}
+
+int play(bool isolation) {
+  int curGoal = -1;
+  tuple<float, float> goals[6];
+  if(TEAM_COLOR == 0){
+    tuple<float, float> g [] = {tuple<float, float>(-1,1), tuple<float, float>(-1, 0), tuple<float, float>(0,1), tuple<float, float>(0, 0), tuple<float, float>(1,1), tuple<float, float>(1, 0)};
+    for(int i = 0; i < 6; i++){
+      goals[i] = g[i];
+    }
+  } else {
+    tuple<float, float> g [] = {tuple<float, float>(-1,-1), tuple<float, float>(-1, 0), tuple<float, float>(0,-1), tuple<float, float>(0, 0), tuple<float, float>(1,-1), tuple<float, float>(1, 0)};
+    for(int i = 0; i < 6; i++){
+      goals[i] = g[i];
     }
   }
 
-  return false;
-}
-
-
-int play(bool isolation) {
-  while(1){
-
-    switch(phase){
-      case 1: { // find ball. DOESNT WORK
-        // double bestX = 1000;
-        // double bestY = 1000;
-        // double roboX = local_map.pos.x;
-        // double roboY = local_map.pos.y;
-        // double bestDist = 100000.0;
-        // for (int i = 0; i < 4; i++){
-
-        //   for(MAP_OBJECTS each: local_map.mapobj){
-        //     if((each.positionX != 0.0 || each.positionY != 0.0) || each.classID == TEAM_COLOR){
-        //       if ((isolation && (
-        //            (TEAM_COLOR == 0 && manager_robot && each.positionX < 0 && each.positionY > 0)
-        //         || (TEAM_COLOR == 1 && manager_robot && each.positionX > 0 && each.positionY > 0) 
-        //         || (TEAM_COLOR == 0 && !manager_robot && each.positionX < 0 && each.positionY < 0)
-        //         || (TEAM_COLOR == 1 && !manager_robot && each.positionX > 0 && each.positionY < 0)))
-        //       || (!isolation && (
-        //            (TEAM_COLOR == 0 && manager_robot && each.positionY > 0) 
-        //         || (TEAM_COLOR == 1 && manager_robot && each.positionY > 0) 
-        //         || (TEAM_COLOR == 0 && !manager_robot && each.positionY < 0) 
-        //         || (TEAM_COLOR == 1 && !manager_robot && each.positionY < 0)))){
-        //         if((abs(each.positionX - GOAL_CONST) > DISTANCE_BUFFER || abs(each.positionX + GOAL_CONST) > DISTANCE_BUFFER || abs(each.positionX) > DISTANCE_BUFFER) && (abs(each.positionY - GOAL_CONST) > DISTANCE_BUFFER || abs(each.positionY + GOAL_CONST) > DISTANCE_BUFFER || abs(each.positionY) > DISTANCE_BUFFER)){
-        //           double dist = (roboX-each.positionX) * (roboX-each.positionX) + (roboY-each.positionY) * (roboY-each.positionY);
-        //           // Find X and Y coordinates that give smallest distance
-        //           if (dist < bestDist){
-        //             bestX = each.positionX;
-        //             bestY = each.positionY;
-        //             bestDist = dist;
-        //           }
-        //         }
-        //       }
-        //     }
-        //   }
-        //   double cur = local_map.pos.az;
-        //   // fprintf(fp, "\nRUN\n");
-        //   while(!tank.move(0, 0, local_map.pos.az, (cur + 90.0), 0.5)){
-        //     this_thread::sleep_for(loop_time);
-        //   }
-        //   tank.drive(0, 0);
-        // }
-
-        // targetX = bestX / 25.4;
-        // targetY = bestY / 25.4;
-        // fprintf(fp, "BALL: %.2f %.2f\n", targetX, targetY);
-        // // fprintf(fp, "MAP OBJECTS: \n");
-        // // for(MAP_OBJECTS each: local_map.mapobj){
-        // //   if((each.classID == 0 || each.classID == 1 || each.classID == 2) && (each.positionX != 0.0 || each.positionY != 0.0)){
-        // //     fprintf(fp, "%ld %ld %.2f %.2f %.2f\n", each.age, each.classID, each.positionX/25.4, each.positionY/25.4, each.positionZ/25.4);
-        // //   }
-        // // }
-        // // fprintf(fp, "\n");
-        // // for(MAP_OBJECTS each : local_map.mapobj){
-        // //   fprintf(fp, "%.2f %.2f\n", each.positionX/25.4, each.positionY/25.4);
-        // // }
-        // fprintf(fp, "%d", local_map.mapnum);
-        // if(bestX != 1000)
-        //   phase++;
-        // break;
-        targetX = -36;
-        targetY = 36;
+  while(2585 > 285){
+    curGoal++;
+    if(curGoal >= sizeof(goals)/sizeof(goals[0]))
+      curGoal = 0;
+      double targetX = GOAL_CONST * get<0>(goals[curGoal]);
+      double targetY = GOAL_CONST * get<1>(goals[curGoal]);
+      double targetAZ;
+      if(curGoal % 2 == 0)
+        targetAZ = 0;
+      else
         targetAZ = 180;
-        phase++;
-        break;
-      } case 2: { // drive to ball
-        if(drive(local_map, targetX, targetY, tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY))){
-          drivePhase = 1; phase++;
-        }
-
-        break;
-      } case 3: { // intake ball
-        ballStor.intake(50);
-        tank.drive(50, 0);
-
-        this_thread::sleep_for(2000);
-
-        ballStor.intake(0);
-        tank.drive(-50, 0);
-        
-        this_thread::sleep_for(2000);
-
-        tank.drive(0, 0);
-        phase++;
-        break;
-      } case 4: { // find goal
-        // set targetX, targetY
-        // when successful, increment phase
-        if (TEAM_COLOR == 0) {
-          targetX = get<0>(redIsolation[0])*X_MARKS_SPOT;
-          targetY = get<1>(redIsolation[0])*X_MARKS_SPOT;
-          targetAZ += 90;
-        } else {
-          targetX = get<0>(blueIsolation[0])*X_MARKS_SPOT;
-          targetY = get<1>(blueIsolation[0])*X_MARKS_SPOT;
-          targetAZ += 90;
-        }
-
-        if (targetAZ >= 360){
-          targetAZ -= 360;
-        }
-
-        phase++;
-      } case 5: { // drive to goal
-        double angle;
-        if(drivePhase == 1 || drivePhase == 2)
-          angle = tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY);
-        else
-          angle = targetAZ; // target location
-        
-        if(drive(local_map, targetX, targetY, angle)){
-          drivePhase = 1; phase++;
-        }
-
-        break;
-      } case 6: { // deposit ball
-        vector<MAP_OBJECTS> ballsInGoal;
-        // Rewrite
-        for(MAP_OBJECTS each: local_map.mapobj){
-          if(each.classID != 2 && (abs(each.positionX - targetX * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER && abs(each.positionY - targetY * GOAL_CONST/GOAL_CONST_BEFORE) < DISTANCE_BUFFER)){
-            ballsInGoal.push_back(each);
-          }
-        }
-        sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-        // fprintf(fp, "%d", ballsInGoal.size());
-
-        tank.drive(50, 0);
-        this_thread::sleep_for(1000);
-
-        tank.drive(0, 0);
-        if(ballsInGoal.size() == 3){
-          ballStor.intake(50);
-          this_thread::sleep_for(750);
-        }
-
-        ballStor.intake(0);
-        ballStor.shoot(50);
-
-        this_thread::sleep_for(500);
-
-        ballStor.shoot(0);
-        tank.drive(-50, 0);
-
-        this_thread::sleep_for(1000);
-
-        tank.drive(0, 0);
-
-        if(ballsInGoal.size() == 3){
-          if(ballsInGoal[0].classID == TEAM_COLOR){
-            phase = 4;
-          } else {
-            ballStor.shoot(50);
-            this_thread::sleep_for(1000);
-            ballStor.shoot(0);
-            phase = 1;
-          }
-        } else {
-          phase = 1;
-        }
-        break;
+      
+      while(!tank.move(STOP_BEFORE, dist(targetX, targetY, local_map.pos.x, local_map.pos.y), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY), 0.5)){
+        this_thread::sleep_for(loop_time);
       }
-    }
+      while(!tank.move(0, 0, local_map.pos.az, targetAZ, 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
 
-    this_thread::sleep_for(loop_time);
+      vector<fifo_object_box> ballsInGoal;
+      for(fifo_object_box each: local_map.boxobj){
+        if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+          ballsInGoal.push_back(each);
+        }
+      }
+      sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
+      for(fifo_object_box each: ballsInGoal){
+        fprintf(fp, "%d %d\n", each.x, each.y);
+      }
+
+      tank.drive(30, 0);
+      this_thread::sleep_for(500);
+      tank.drive(0, 0);
+      while(ballsInGoal.size() > 0){
+        if(ballsInGoal.back().classID == TEAM_COLOR){
+          
+          ballStor.intake(50);
+          ballStor.shoot(50);
+
+          this_thread::sleep_for(500);
+
+          ballStor.intake(0);
+          ballStor.shoot(0);
+        } else {
+          ballStor.intake(50);
+          this_thread::sleep_for(500);
+          ballStor.intake(0);
+
+
+          tank.drive(-30, 0);
+          this_thread::sleep_for(500);
+          tank.drive(0, 30);
+          this_thread::sleep_for(500);
+          tank.drive(0, 0);
+          ballStor.intake(-50);
+          this_thread::sleep_for(500);
+          ballStor.intake(0);
+          tank.drive(0, -30);
+          this_thread::sleep_for(500);
+          tank.drive(30, 0);
+          this_thread::sleep_for(500);
+          tank.drive(0, 0);
+        }
+        ballsInGoal.pop_back();
+      }
+      tank.drive(-30, 0);
+      this_thread::sleep_for(500);
+      tank.drive(0, 0);
   }
 }
 
@@ -269,11 +175,98 @@ int play(bool isolation) {
 
 void auto_Isolation(void) {
   tank.drive(50, 0);
-  
-  this_thread::sleep_for(1000);
-
+  this_thread::sleep_for(250);
   tank.drive(0, 0);
-  play(true);
+
+  if (TEAM_COLOR == 0){
+    // Red: Manager on top
+    if (manager_robot){
+      // Drive to middle left goal
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, -GOAL_CONST, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, -GOAL_CONST, 0), 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
+      
+      // Deposit ball
+      score();
+
+      ballStor.intake(50);
+      // Move towards top left goal and intake ball
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, -GOAL_CONST, GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, -GOAL_CONST, GOAL_CONST), 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
+      
+      score();
+      // Turn towards center ball on midline
+
+      ballStor.intake(50);
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, 36), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, 36), 0.50)){
+        this_thread::sleep_for(loop_time);
+      }
+      ballStor.intake(0);
+
+      intake();
+      // Turn towards middle goal
+
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, 0), 0.25)){
+        this_thread::sleep_for(loop_time);
+      }
+      score();
+
+    // Red: worker on Bottom
+    } else {
+      // Turn towards bottom left goal
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, -GOAL_CONST, -GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, -GOAL_CONST, -GOAL_CONST), 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
+      
+      // Deposit ball
+      score();
+    }
+  }
+  // Blue
+  else if (TEAM_COLOR == 1){
+    // Blue: Manager (on bottom)
+    if (manager_robot){
+        // Drive to middle right goal
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, GOAL_CONST, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, GOAL_CONST, 0), 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
+      
+      // Deposit ball
+      score();
+
+      ballStor.intake(50);
+      // Move towards bottom right goal and intake ball
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, GOAL_CONST, -GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, GOAL_CONST, -GOAL_CONST), 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
+      
+      score();
+      // Turn towards center ball on midline
+
+      ballStor.intake(50);
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, -36), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, -36), 0.50)){
+        this_thread::sleep_for(loop_time);
+      }
+      ballStor.intake(0);
+
+      intake();
+      // Turn towards middle goal
+
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, 0), 0.25)){
+        this_thread::sleep_for(loop_time);
+      }
+      score();
+    }else{
+      // Turn towards top right goal
+      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, GOAL_CONST, GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, GOAL_CONST, GOAL_CONST), 0.5)){
+        this_thread::sleep_for(loop_time);
+      }
+      
+      // Deposit ball
+      score();
+    }
+  }
 }
 
 void auto_Interaction(void) {

@@ -61,11 +61,20 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   double power = move_speed(dist, targetDist);
   double turn = turn_speed(heading, targetHeading);
   
+  if(abs(targetHeading - heading) > 10){
+    drive(0, turn * speedMultiplier);
+  } else {
   // fprintf(fpp, "%.2f %.2f\n", heading, targetHeading);
-  drive(power * speedMultiplier, turn * speedMultiplier);
+    drive(power * speedMultiplier, turn * speedMultiplier);
+  }
 
   return abs(targetDist - dist) < DISTANCE_BUFFER && abs(targetHeading - heading) < TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
 }
+
+bool tankDrive::move(double dist, double targetDist, double heading, double targetHeading){
+  return move(dist, targetDist, heading, targetHeading, 0.5);
+}
+
 
 tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){
   double newX;

@@ -24,6 +24,9 @@ public:
   bool move(double, double, double, double, double);
   bool move(double, double, double, double);
 
+  void drive(double);
+  void rotate(double);
+
   tuple<pair<double, double>, double> closestJoinHighway(double, double);
   tuple<pair<double, double>, double> closestLeaveHighway(double, double);
 

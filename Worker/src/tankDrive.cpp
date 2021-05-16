@@ -13,6 +13,9 @@ using namespace std;
 double turn_kP = 1.0; // TO-DO: Tune kP
 double move_kP = 1.0; // TO-DO: Tune kP
 
+double moveConst = 45;
+double rotateConst = 45;
+
 tankDrive::tankDrive(){}
 
 void tankDrive::move_left_side(double speed) {
@@ -55,6 +58,16 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   drive(power, turn);
 
   return abs(targetDist - dist) > DISTANCE_BUFFER && abs(targetHeading - heading) > TURNING_BUFFER; // Returns true if we are at the target x,y,ax, false if we have not yet reached the destination
+}
+
+void tankDrive::drive(double dist){ // distance is in inches
+  left_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
+  right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
+}
+
+void tankDrive::rotate(double angle){ // distance is in inches
+  left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, true);
+  right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, true);
 }
 
 tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){

@@ -13,6 +13,9 @@ using namespace std;
 #define turn_kP 0.3 // TO-DO: Tune kP
 #define move_kP 0.5 // TO-DO: Tune kP
 
+#define moveConst 45
+#define rotateConst 45
+
 FILE *fpp = fopen("/dev/serial2","wb");
 
 tankDrive::tankDrive(){}
@@ -75,6 +78,15 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   return move(dist, targetDist, heading, targetHeading, 0.5);
 }
 
+void tankDrive::drive(double dist){ // distance is in inches
+  left_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
+  right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
+}
+
+void tankDrive::rotate(double angle){ // distance is in inches
+  left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, true);
+  right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, true);
+}
 
 tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){
   double newX;

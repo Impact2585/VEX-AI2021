@@ -45,27 +45,19 @@ double dist(double ax, double ay, double bx, double by){
 }
 
 void score(){
-  tank.drive(20, 0);
-  this_thread::sleep_for(1000);
-  tank.drive(0, 0);
+  tank.drive(8);
   ballStor.shoot(100);
   this_thread::sleep_for(1000);
   ballStor.shoot(0);
-  tank.drive(-20, 0);
-  this_thread::sleep_for(1000);
-  tank.drive(0, 0);
+  tank.drive(-8);
 }
 
 void intake(){
-  tank.drive(20, 0);
-  this_thread::sleep_for(1000);
-  tank.drive(0, 0);
+  tank.drive(8);
   ballStor.intake(100);
   this_thread::sleep_for(1000);
   ballStor.intake(0);
-  tank.drive(-20, 0);
-  this_thread::sleep_for(1000);
-  tank.drive(0, 0);
+  tank.drive(8);
 }
 
 int play(bool isolation) {
@@ -113,9 +105,7 @@ int play(bool isolation) {
         fprintf(fp, "%d %d\n", each.x, each.y);
       }
 
-      tank.drive(30, 0);
-      this_thread::sleep_for(500);
-      tank.drive(0, 0);
+      tank.drive(12);
       while(ballsInGoal.size() > 0){
         if(ballsInGoal.back().classID == TEAM_COLOR){
           
@@ -132,25 +122,17 @@ int play(bool isolation) {
           ballStor.intake(0);
 
 
-          tank.drive(-30, 0);
-          this_thread::sleep_for(500);
-          tank.drive(0, 30);
-          this_thread::sleep_for(500);
-          tank.drive(0, 0);
+          tank.drive(-12);
+          tank.rotate(90);
           ballStor.intake(-50);
           this_thread::sleep_for(500);
           ballStor.intake(0);
-          tank.drive(0, -30);
-          this_thread::sleep_for(500);
-          tank.drive(30, 0);
-          this_thread::sleep_for(500);
-          tank.drive(0, 0);
+          tank.rotate(90);
+          tank.drive(12);
         }
         ballsInGoal.pop_back();
       }
-      tank.drive(-30, 0);
-      this_thread::sleep_for(500);
-      tank.drive(0, 0);
+      tank.drive(-12);
   }
 }
 
@@ -174,9 +156,7 @@ int play(bool isolation) {
 // }
 
 void auto_Isolation(void) {
-  tank.drive(50, 0);
-  this_thread::sleep_for(250);
-  tank.drive(0, 0);
+  tank.drive(20);
 
   if (TEAM_COLOR == 0){
     // Red: Manager on top

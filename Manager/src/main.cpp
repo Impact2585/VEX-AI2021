@@ -57,7 +57,7 @@ void intake(){
   ballStor.intake(100);
   this_thread::sleep_for(1000);
   ballStor.intake(0);
-  tank.drive(8);
+  tank.drive(-8);
 }
 
 int play(bool isolation) {

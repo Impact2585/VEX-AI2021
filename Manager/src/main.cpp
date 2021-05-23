@@ -161,26 +161,28 @@ void auto_Isolation(void) {
   if (TEAM_COLOR == 0){
     // Red: Manager on top
     if (manager_robot){
-      // Drive to middle left goal
       
-      
-      // Deposit ball
+      //score ball that was input
       score();
 
-      ballStor.intake(50);
-      // Move towards top left goal and intake ball
-     
-      
-      score();
-      // Turn towards center ball on midline
+      //turn toward (-36, 36)
+      tank.rotate(-tank.az);
+      tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
 
-      ballStor.intake(50);
+      //drive to (-36, 36)
+      tank.drive(dist(tank.x, tank.y, -36, 36));
       
-      ballStor.intake(0);
+      //now we're there, turn toward ball/goal at top left
+      tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
 
+      //drive to the bottom right corner of the top left square
+      tank.drive(dist(tank.x, tank.y, -48, 48));
+
+      //intake the ball there
       intake();
-      // Turn towards middle goal
 
+      //move a little forward, then score
+      tank.drive(2);
       score();
 
     // Red: worker on Bottom

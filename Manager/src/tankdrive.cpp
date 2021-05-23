@@ -18,6 +18,10 @@ using namespace std;
 
 FILE *fpp = fopen("/dev/serial2","wb");
 
+float x = 0;
+float y = 0;
+float az = 0;
+
 tankDrive::tankDrive(){}
 
 void tankDrive::move_left_side(double speed) {
@@ -79,11 +83,19 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
 }
 
 void tankDrive::drive(double dist){ // distance is in inches
+  // Do math to figure out new location
+  x += dist * cos(az * PI/180);
+  y += dist * sin(az * PI/180);
   left_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
   right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
 }
 
 void tankDrive::rotate(double angle){ // distance is in inches
+  az += angle;
+  while(az > 360)
+    az -= 360;
+  while(az < 0)
+    az += 360;
   left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, true);
   right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, true);
 }

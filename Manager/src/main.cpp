@@ -17,13 +17,13 @@ using namespace std;
 // This is the manager robot. THE MANAGER ROBOT IS  PLACED TO THE NORTH OF THE WORKER ROBOT 
 // ON THE RED TEAM, AND SOUTH OF THE WORKER ROBOT ON THE BLUE TEAM.
 #define manager_robot true
+#define loop_time 66
 
 // A global instance of competition
 competition Competition;
 
 // AI Jetson Nano
 ai::jetson  jetson_comms;
-
 // #pragma message("building for the manager")
 ai::robot_link       link( VEX_LINK, "robot_32456_1", linkType::manager );
 
@@ -31,7 +31,6 @@ ai::robot_link       link( VEX_LINK, "robot_32456_1", linkType::manager );
 static tankDrive tank;
 static ballStorage ballStor;
 
-int32_t loop_time = 66;
 static MAP_RECORD local_map;
 
 FILE *fp = fopen("/dev/serial2","wb");
@@ -86,13 +85,14 @@ int play(bool isolation) {
         targetAZ = 0;
       else
         targetAZ = 180;
-      
-      while(!tank.move(STOP_BEFORE, dist(targetX, targetY, local_map.pos.x, local_map.pos.y), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
-      while(!tank.move(0, 0, local_map.pos.az, targetAZ, 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
+      // Turn towards scoring position
+      tank.rotate(-tank.az);
+      tank.rotate(tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      // Drive to scoring position
+      tank.drive(dist(tank.x, tank.y, targetX, targetY));
+      // Rotate towards goal
+      tank.rotate(targetAZ - tank.az);
+      tank.drive(12);
 
       vector<fifo_object_box> ballsInGoal;
       for(fifo_object_box each: local_map.boxobj){
@@ -162,43 +162,29 @@ void auto_Isolation(void) {
     // Red: Manager on top
     if (manager_robot){
       // Drive to middle left goal
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, -GOAL_CONST, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, -GOAL_CONST, 0), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
+      
       
       // Deposit ball
       score();
 
       ballStor.intake(50);
       // Move towards top left goal and intake ball
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, -GOAL_CONST, GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, -GOAL_CONST, GOAL_CONST), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
+     
       
       score();
       // Turn towards center ball on midline
 
       ballStor.intake(50);
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, 36), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, 36), 0.50)){
-        this_thread::sleep_for(loop_time);
-      }
+      
       ballStor.intake(0);
 
       intake();
       // Turn towards middle goal
 
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, 0), 0.25)){
-        this_thread::sleep_for(loop_time);
-      }
       score();
 
     // Red: worker on Bottom
     } else {
-      // Turn towards bottom left goal
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, -GOAL_CONST, -GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, -GOAL_CONST, -GOAL_CONST), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
-      
       // Deposit ball
       score();
     }
@@ -207,42 +193,28 @@ void auto_Isolation(void) {
   else if (TEAM_COLOR == 1){
     // Blue: Manager (on bottom)
     if (manager_robot){
-        // Drive to middle right goal
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, GOAL_CONST, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, GOAL_CONST, 0), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
+      // Drive to middle right goal
+      
       
       // Deposit ball
       score();
 
       ballStor.intake(50);
       // Move towards bottom right goal and intake ball
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, GOAL_CONST, -GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, GOAL_CONST, -GOAL_CONST), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
+      
       
       score();
       // Turn towards center ball on midline
 
       ballStor.intake(50);
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, -36), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, -36), 0.50)){
-        this_thread::sleep_for(loop_time);
-      }
+      
       ballStor.intake(0);
 
       intake();
       // Turn towards middle goal
 
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, 0, 0), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, 0, 0), 0.25)){
-        this_thread::sleep_for(loop_time);
-      }
       score();
-    }else{
-      // Turn towards top right goal
-      while(!tank.move(STOP_BEFORE, dist(local_map.pos.x, local_map.pos.y, GOAL_CONST, GOAL_CONST), local_map.pos.az, tank.angleBetween(local_map.pos.x, local_map.pos.y, GOAL_CONST, GOAL_CONST), 0.5)){
-        this_thread::sleep_for(loop_time);
-      }
-      
+    } else {
       // Deposit ball
       score();
     }
@@ -279,6 +251,9 @@ int main() {
 
   thread t1(dashboardTask);
   Competition.autonomous(autonomousMain);
+  float lastX = 0;
+  float lastY = 0;
+  float lastAz = 0;
   // linkA.received("demoMessage", receiveDemo);
   // Prevent main from exiting with an infinite loop.
   // print through the controller to the terminal (vexos 1.0.12 is needed)
@@ -303,6 +278,16 @@ int main() {
         //   fprintf(fp, "%ld %ld %.2f %.2f %.2f\n", each.age, each.classID, each.positionX/25.4, each.positionY/25.4, each.positionZ);
         // }
         // fprintf(fp, "\n");
+
+        // Update the current position, if it has changed
+        if(local_map.pos.x != lastX || local_map.pos.y != lastY || local_map.pos.az != lastAz){
+          tank.x = local_map.pos.x;
+          tank.y = local_map.pos.y;
+          tank.az = local_map.pos.az;
+          lastX = local_map.pos.x;
+          lastY = local_map.pos.y;
+          lastAz = local_map.pos.az;
+        }
 
         // Allow other tasks to run
         this_thread::sleep_for(loop_time);

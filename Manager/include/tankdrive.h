@@ -6,9 +6,10 @@ using namespace std;
 
 class tankDrive{
 public:
-  double turn_kP;
-  double move_kP;
-
+  float x;
+  float y;
+  float az;
+  
   tankDrive();
 
   void move_left_side(double);

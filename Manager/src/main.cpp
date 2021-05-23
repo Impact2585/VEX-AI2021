@@ -184,7 +184,14 @@ void auto_Isolation(void) {
       //move a little forward, then score
       tank.drive(2);
       score();
-
+      tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
+tank.drive(dist(tank.x, tank.y, 0, 36));
+intake();
+ tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
+tank.drive(dist(tank.x, tank.y, 0, 0));
+score();
     // Red: worker on Bottom
     } else {
       // Deposit ball

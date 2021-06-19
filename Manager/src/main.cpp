@@ -9,7 +9,7 @@
 using namespace vex;
 using namespace std;
 
-#define STOP_BEFORE 12.0
+#define STOP_BEFORE 32.0
 #define GOAL_CONST 68.0
 
 // 0 is red team, 1 is blue team. Change the program run during competition for rounds. 1 = red team, 2 = blue team
@@ -44,7 +44,7 @@ double dist(double ax, double ay, double bx, double by){
 }
 
 void score(){
-  tank.drive(8);
+  //tank.drive(8);
   ballStor.shoot(100);
   this_thread::sleep_for(1000);
   ballStor.shoot(0);
@@ -86,13 +86,13 @@ int play(bool isolation) {
       else
         targetAZ = 180;
       // Turn towards scoring position
-      tank.rotate(-tank.az);
-      tank.rotate(tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
       // Drive to scoring position
-      tank.drive(dist(tank.x, tank.y, targetX, targetY));
-      // Rotate towards goal
-      tank.rotate(targetAZ - tank.az);
-      tank.drive(12);
+      tank.drive(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE);
+      fprintf(fp, "%f\n", -tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      fprintf(fp, "%f %f %f %f\n", tank.x, tank.y, tank.az, tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      // tank.drive(12);
 
       vector<fifo_object_box> ballsInGoal;
       for(fifo_object_box each: local_map.boxobj){
@@ -102,7 +102,7 @@ int play(bool isolation) {
       }
       sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
       for(fifo_object_box each: ballsInGoal){
-        fprintf(fp, "%d %d\n", each.x, each.y);
+        fprintf(fp, "%d %d\n" , each.x, each.y);
       }
 
       tank.drive(12);
@@ -156,18 +156,27 @@ int play(bool isolation) {
 // }
 
 void auto_Isolation(void) {
-  tank.drive(20);
+  //tank.drive(20);
 
   if (TEAM_COLOR == 0){
     // Red: Manager on top
     if (manager_robot){
-      
       //score ball that was input
+      //tank.drive(8);
+      tank.drive(-50);
+      tank.rotate(-45);
+      tank.drive(36);
       score();
 
       //turn toward (-36, 36)
-      tank.rotate(-tank.az);
-      tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
+      tank.drive(-30);
+      tank.rotate(55);
+      ballStor.intake(100);
+      tank.drive(60);
+      ballStor.intake(0);
+      score();
+      //tank.rotate(-tank.az);
+      //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
 
       //drive to (-36, 36)
       tank.drive(dist(tank.x, tank.y, -36, 36));
@@ -244,10 +253,10 @@ void autonomousMain(void) {
   // and we will enter the interaction period. 
   // ..........................................................................
 
-  if(firstAutoFlag)
+  // if(firstAutoFlag)
     auto_Isolation();
-  else 
-    auto_Interaction();
+  // else 
+    // auto_Interaction();
 
   firstAutoFlag = false;
 }
@@ -257,7 +266,6 @@ void autonomousMain(void) {
 //
 int main() {
   vexcodeInit();
-
   thread t1(dashboardTask);
   Competition.autonomous(autonomousMain);
   float lastX = 0;

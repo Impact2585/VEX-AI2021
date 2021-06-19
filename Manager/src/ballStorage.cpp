@@ -4,6 +4,8 @@
 
 using namespace vex;
 
+FILE *ffp = fopen("/dev/serial2","wb");
+
 ballStorage::ballStorage(){}
 
 void ballStorage::run_intake(double speed){

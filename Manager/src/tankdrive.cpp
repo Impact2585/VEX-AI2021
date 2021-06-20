@@ -82,27 +82,37 @@ bool tankDrive::move(double dist, double targetDist, double heading, double targ
   return move(dist, targetDist, heading, targetHeading, 0.5);
 }
 
+void tankDrive::driveTime(int milli, int power){
+  left_drive.spin(directionType::fwd, power, percentUnits::pct);
+  right_drive.spin(directionType::fwd, power, percentUnits::pct);
+  this_thread::sleep_for(milli);
+
+  left_drive.spin(directionType::fwd, 0, percentUnits::pct);
+  right_drive.spin(directionType::fwd, 0, percentUnits::pct);
+}
+
 void tankDrive::drive(double dist){ // distance is in inches
   // Do math to figure out new location
-  x += dist * cos(az * PI/180);
-  y += dist * sin(az * PI/180);
+  x += dist * sin(az * PI/180);
+  y += dist * cos(az * PI/180);
   left_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, false);
   right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
 }
 
 void tankDrive::rotate(double angle){ // distance is in inches
   angle *= -1;
-  while(angle >= 360)
+  while(angle > 180)
     angle -= 360;
-  while(angle <= -360)
+  while(angle < -180)
     angle += 360;
   az += angle;
-  while(az > 360)
+  while(az >= 360)
     az -= 360;
   while(az < 0)
     az += 360;
   left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, false);
   right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, true);
+  this_thread::sleep_for(1000);
 }
 
 tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){
@@ -175,11 +185,20 @@ tuple<pair<double, double>, double> tankDrive::closestLeaveHighway(double target
 }
 
 double tankDrive::angleBetween(double x, double y, double tX, double tY){
-  double angle = (atan2(tX - x, tY - y)) * 180 / M_PI;
-  if(tY - y < 0){
-    angle += 180; 
+  double angle;
+  if(tY - y >= 0){
+    angle = (atan2(tX - x, tY - y)) * 180.0 / M_PI;
+  } else {
+    angle = (atan2(tY - y, tX - x)) * 180.0 / M_PI;
+    if(x < 0){
+      angle += 270;
+      angle *= -1;
+    } else {
+      angle = 90 - angle;
+    }
   }
   if(angle < 0)
-  angle += 360;
+    angle += 360;
+  fprintf(fpp, "ANGLE2: %f\n", angle);
   return angle;
 }

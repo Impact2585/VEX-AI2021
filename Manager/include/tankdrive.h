@@ -25,6 +25,7 @@ public:
   bool move(double, double, double, double, double);
   bool move(double, double, double, double);
 
+  void driveTime(int, int);
   void drive(double);
   void rotate(double);
 

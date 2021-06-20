@@ -9,8 +9,8 @@
 using namespace vex;
 using namespace std;
 
-#define STOP_BEFORE 32.0
-#define GOAL_CONST 68.0
+#define STOP_BEFORE 48.0
+#define GOAL_CONST 72.0
 
 // 0 is red team, 1 is blue team. Change the program run during competition for rounds. 1 = red team, 2 = blue team
 #define TEAM_COLOR 0
@@ -75,64 +75,95 @@ int play(bool isolation) {
   }
 
   while(2585 > 285){
+    this_thread::sleep_for(2000);
     curGoal++;
     if(curGoal >= sizeof(goals)/sizeof(goals[0]))
       curGoal = 0;
-      double targetX = GOAL_CONST * get<0>(goals[curGoal]);
-      double targetY = GOAL_CONST * get<1>(goals[curGoal]);
-      double targetAZ;
-      if(curGoal % 2 == 0)
-        targetAZ = 0;
-      else
-        targetAZ = 180;
-      // Turn towards scoring position
-      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
-      // Drive to scoring position
-      tank.drive(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE);
-      fprintf(fp, "%f\n", -tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
-      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
-      fprintf(fp, "%f %f %f %f\n", tank.x, tank.y, tank.az, tank.angleBetween(tank.x, tank.y, targetX, targetY));
-      // tank.drive(12);
+    double targetX = GOAL_CONST * get<0>(goals[curGoal]);
+    double targetY = GOAL_CONST * get<1>(goals[curGoal]);
+    double targetAZ;
+    if(curGoal % 2 == 0)
+      targetAZ = 0;
+    else
+      targetAZ = 180;
 
-      vector<fifo_object_box> ballsInGoal;
+    while(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE > 12){
+      turn:
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      fprintf(fp, "2: %f %f %f %f %f %f\n", tank.x, tank.y, tank.az, targetX, targetY, tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      // Drive to scoring position
+      if(abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY)) > 10)
+        goto turn;
+      drive:
+      float d = min(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE, 36.0);
+      tank.drive(d);
+    }
+    turn2:
+    tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+    if(abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY)) > 8)
+        goto turn2;
+
+    vector<fifo_object_box> ballsInGoal;
+    for(fifo_object_box each: local_map.boxobj){
+      if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+        ballsInGoal.push_back(each);
+      }
+    }
+    while(ballsInGoal.size() > 0){
+      sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
+      for(fifo_object_box each: ballsInGoal){
+        fprintf(fp, "%d %d %d\n" , each.x, each.y, each.classID);
+      }
+
+      if(ballsInGoal.front().classID == TEAM_COLOR)
+        break;
+
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+
+      if(ballsInGoal.back().classID == TEAM_COLOR){
+        tank.driveTime(2000, 50);
+        ballStor.intake(100);
+
+        if(ballsInGoal.size() == 3){
+          this_thread::sleep_for(1000);
+        } else {
+          this_thread::sleep_for(400);
+        }
+        ballStor.intake(0);
+        ballStor.shoot(100);
+
+        this_thread::sleep_for(2000);
+        ballStor.shoot(0);
+
+        this_thread::sleep_for(500);
+        tank.driveTime(1250, -50);
+      } else {
+        tank.driveTime(2000, 50);
+        ballStor.intake(100);
+        if(ballsInGoal.size() == 3){
+          this_thread::sleep_for(1000);
+        } else {
+          this_thread::sleep_for(400);
+        }
+        ballStor.intake(0);
+
+
+        tank.driveTime(1250, -50);
+        tank.rotate(90);
+        ballStor.intake(-100);
+        this_thread::sleep_for(500);
+        ballStor.intake(0);
+        tank.rotate(-90);
+      }
+      ballsInGoal.clear();
       for(fifo_object_box each: local_map.boxobj){
         if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
           ballsInGoal.push_back(each);
         }
       }
-      sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-      for(fifo_object_box each: ballsInGoal){
-        fprintf(fp, "%d %d\n" , each.x, each.y);
-      }
+    }
 
-      tank.drive(12);
-      while(ballsInGoal.size() > 0){
-        if(ballsInGoal.back().classID == TEAM_COLOR){
-          
-          ballStor.intake(50);
-          ballStor.shoot(50);
-
-          this_thread::sleep_for(500);
-
-          ballStor.intake(0);
-          ballStor.shoot(0);
-        } else {
-          ballStor.intake(50);
-          this_thread::sleep_for(500);
-          ballStor.intake(0);
-
-
-          tank.drive(-12);
-          tank.rotate(90);
-          ballStor.intake(-50);
-          this_thread::sleep_for(500);
-          ballStor.intake(0);
-          tank.rotate(90);
-          tank.drive(12);
-        }
-        ballsInGoal.pop_back();
-      }
-      tank.drive(-12);
+    tank.drive(-24);
   }
 }
 
@@ -165,22 +196,26 @@ void auto_Isolation(void) {
       //tank.drive(8);
       tank.drive(-50);
       tank.rotate(-45);
-      tank.drive(36);
+      tank.drive(28);
+      tank.drive(500, 100);
       score();
 
       //turn toward (-36, 36)
       tank.drive(-30);
-      tank.rotate(55);
+      tank.rotate(58);
       ballStor.intake(100);
       tank.drive(60);
       ballStor.intake(0);
+      tank.drive(500, 100);
       score();
       //tank.rotate(-tank.az);
       //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
 
       //drive to (-36, 36)
-      tank.drive(dist(tank.x, tank.y, -36, 36));
-      
+      //tank.drive(dist(tank.x, tank.y, -36, 36));
+      tank.drive(24);
+      tank.rotate(315);
+      tank.drive(-20);
       //now we're there, turn toward ball/goal at top left
       tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
 
@@ -301,6 +336,8 @@ int main() {
           tank.x = local_map.pos.x;
           tank.y = local_map.pos.y;
           tank.az = local_map.pos.az;
+          while(tank.az < 0)
+            tank.az += 360;
           lastX = local_map.pos.x;
           lastY = local_map.pos.y;
           lastAz = local_map.pos.az;

@@ -6,9 +6,10 @@ using namespace std;
 
 class tankDrive{
 public:
-  double turn_kP;
-  double move_kP;
-
+  float x;
+  float y;
+  float az;
+  
   tankDrive();
 
   void move_left_side(double);
@@ -21,8 +22,10 @@ public:
   // Turning is in units of degrees
   double turn_speed(double, double);
   double move_speed(double, double);
+  bool move(double, double, double, double, double);
   bool move(double, double, double, double);
 
+  void driveTime(int, int);
   void drive(double);
   void rotate(double);
 

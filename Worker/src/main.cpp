@@ -5,189 +5,165 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
-
+#include <stdio.h>
 using namespace vex;
 using namespace std;
 
-#define DISTANCE_BUFFER 1.0
-#define ANGLE_BUFFER 5.0
-#define STOP_BEFORE 12.0
-#define GOAL_CONST_BEFORE 24.0
-#define GOAL_CONST 34.0
-#define X_MARKS_SPOT 18.0
+#define STOP_BEFORE 48.0
+#define GOAL_CONST 72.0
 
 // 0 is red team, 1 is blue team. Change the program run during competition for rounds. 1 = red team, 2 = blue team
-#define TEAM_COLOR 1
-// This is the worker robot. THE WORKER ROBOT IS ALWAYS PLACED TO THE SOUTH OF THE MANAGER ROBOT.
+#define TEAM_COLOR 0
+// This is the manager robot. THE MANAGER ROBOT IS  PLACED TO THE NORTH OF THE WORKER ROBOT 
+// ON THE RED TEAM, AND SOUTH OF THE WORKER ROBOT ON THE BLUE TEAM.
 #define manager_robot false
+#define loop_time 66
 
 // A global instance of competition
 competition Competition;
 
 // AI Jetson Nano
 ai::jetson  jetson_comms;
-
 // #pragma message("building for the manager")
-ai::robot_link       link( VEX_LINK, "robot_32456_1", linkType::worker );
+ai::robot_link       link( VEX_LINK, "robot_32456_1", linkType::manager );
 
 // define your global instances of motors and other devices here
 static tankDrive tank;
 static ballStorage ballStor;
 
-float targetX = 0.0, targetY = 0.0, targetAZ = 315;
-int phase = 1;
-int drivePhase = 1;
-int32_t loop_time = 66;
 static MAP_RECORD local_map;
 
 FILE *fp = fopen("/dev/serial2","wb");
 
-bool drive(MAP_RECORD local_map, double tAZ, double tX, double tY){
-  switch(drivePhase) {
-    case 1: { // Turn to target heading
-      if(tank.move(0, 0, local_map.pos.az, tAZ)){
-        drivePhase++;
-      }
-      break;
-    } case 2: { // Drive straight to target
-      int changeX = max(tX, (double)local_map.pos.x) - min(tX, (double)local_map.pos.x);
-      int changeY = max(tY, (double)local_map.pos.y) - min(tY, (double)local_map.pos.y);
-      if(tank.move(0, sqrt(changeX * changeX + changeY * changeY), local_map.pos.az, tAZ)){
-        drivePhase++;
-      }
-      break;
-    } case 3: { // Turn to final target heading
-      if(tank.move(0, 0, local_map.pos.az, tAZ)){
-        return true;
-      }
-      break; 
+bool orderByHeight (fifo_object_box i, fifo_object_box j) {
+  return i.y > j.y;
+}
+
+double dist(double ax, double ay, double bx, double by){
+  return sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+}
+
+void score(){
+  //tank.drive(8);
+  ballStor.shoot(100);
+  this_thread::sleep_for(1000);
+  ballStor.shoot(0);
+  tank.drive(-8);
+}
+
+void intake(){
+  tank.drive(8);
+  ballStor.intake(100);
+  this_thread::sleep_for(1000);
+  ballStor.intake(0);
+  tank.drive(-8);
+}
+
+int play(bool isolation) {
+  int curGoal = -1;
+  tuple<float, float> goals[6];
+  if(TEAM_COLOR == 0){
+    tuple<float, float> g [] = {tuple<float, float>(0,0), tuple<float, float>(0, 1), tuple<float, float>(1,1), tuple<float, float>(1, 0), tuple<float, float>(1, -1), tuple<float, float>(0, -1)};
+    for(int i = 0; i < 6; i++){
+      goals[i] = g[i];
+    }
+  } else {
+    tuple<float, float> g [] = {tuple<float, float>(0, 0), tuple<float, float>(0, -1), tuple<float, float>(-1, -1), tuple<float, float>(-1, 0), tuple<float, float>(-1,1), tuple<float, float>(0, 1)};
+    for(int i = 0; i < 6; i++){
+      goals[i] = g[i];
     }
   }
 
-  return false;
-}
+  while(2585 > 285){
+    this_thread::sleep_for(2000);
+    curGoal++;
+    if(curGoal >= sizeof(goals)/sizeof(goals[0]))
+      curGoal = 0;
+    double targetX = GOAL_CONST * get<0>(goals[curGoal]);
+    double targetY = GOAL_CONST * get<1>(goals[curGoal]);
+    double targetAZ;
+    if(curGoal % 2 == 0)
+      targetAZ = 0;
+    else
+      targetAZ = 180;
 
-
-void play(bool isolation) {
-  while(1){
-    fprintf(fp, "ROBOT LOCATION: " );
-    fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az);
-    fprintf(fp, "MAP OBJECTS: \n");
-    for(MAP_OBJECTS each: local_map.mapobj){
-      fprintf(fp, "%ld %ld %.2f %.2f %.2f", each.age, each.classID, each.positionX, each.positionY, each.positionZ);
+    while(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE > 12){
+      turn:
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      fprintf(fp, "2: %f %f %f %f %f %f\n", tank.x, tank.y, tank.az, targetX, targetY, tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      // Drive to scoring position
+      if(abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY)) > 10)
+        goto turn;
+      drive:
+      float d = min(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE, 36.0);
+      tank.drive(d);
     }
-    fprintf(fp, "\n");
-    
-    switch(phase){
-      case 1: { // find ball
-        int camRange = 60;
-        float bestX;
-        float bestY;
-        float roboX = local_map.pos.x;
-        float roboY = local_map.pos.y;
-        float bestDist = 100;
-        for (int i = 0; i<360/camRange; i+=camRange){
+    turn2:
+    tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+    if(abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY)) > 8)
+        goto turn2;
 
-          for(MAP_OBJECTS each: local_map.mapobj){
-            if(each.classID == TEAM_COLOR){
-              if ((isolation && (
-                   (TEAM_COLOR == 0 && manager_robot && each.positionX < 0 && each.positionY > 0)
-                || (TEAM_COLOR == 1 && manager_robot && each.positionX > 0 && each.positionY > 0) 
-                || (TEAM_COLOR == 0 && !manager_robot && each.positionX < 0 && each.positionY < 0)
-                || (TEAM_COLOR == 1 && !manager_robot && each.positionX > 0 && each.positionY < 0)))
-              || (!isolation && (
-                   (TEAM_COLOR == 0 && manager_robot && each.positionY > 0) 
-                || (TEAM_COLOR == 1 && manager_robot && each.positionY > 0) 
-                || (TEAM_COLOR == 0 && !manager_robot && each.positionY < 0) 
-                || (TEAM_COLOR == 1 && !manager_robot && each.positionY < 0)))){
-                if((abs(each.positionX - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionX) < DISTANCE_BUFFER) && (abs(each.positionY - GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY + GOAL_CONST) < DISTANCE_BUFFER || abs(each.positionY) < DISTANCE_BUFFER)){
-                  float dist = sqrt(pow((roboX-each.positionX),2) + pow((roboY-each.positionY),2));
-                  // Find X and Y coordinates that give smallest distance
-                  if (dist < bestDist){
-                    bestX = each.positionX;
-                    bestY = each.positionY;
-                    bestDist = dist;
-                  }
-                }
-              }
-            }
-          }
-          // Rotate 60 degrees to the next reference frame
-          float ang = local_map.pos.az + camRange;
-          while(!tank.move(0, 0, local_map.pos.az, ang)){
-            this_thread::sleep_for(loop_time);
-          }
-        }
-        targetX = bestX;
-        targetY = bestY;
-        phase++;
+    vector<fifo_object_box> ballsInGoal;
+    for(fifo_object_box each: local_map.boxobj){
+      if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+        ballsInGoal.push_back(each);
+      }
+    }
+    while(ballsInGoal.size() > 0){
+      sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
+      for(fifo_object_box each: ballsInGoal){
+        fprintf(fp, "%d %d %d\n" , each.x, each.y, each.classID);
+      }
+
+      if(ballsInGoal.front().classID == TEAM_COLOR)
         break;
-      } case 2: { // drive to ball
-        if(drive(local_map, targetX, targetY, tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY))){
-          drivePhase = 1; phase++;
-        }
 
-        break;
-      } case 3: { // intake ball
-        ballStor.intake(50);
-        tank.drive(50, 0);
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
 
-        this_thread::sleep_for(2000);
+      if(ballsInGoal.back().classID == TEAM_COLOR){
+        tank.driveTime(2000, 50);
+        ballStor.intake(100);
 
-        ballStor.intake(0);
-        tank.drive(-50, 0);
-        
-        this_thread::sleep_for(2000);
-
-        tank.drive(0, 0);
-        phase++;
-        break;
-      } case 4: { // find goal
-        // set targetX, targetY
-        // when successful, increment phase
-        if (TEAM_COLOR == 0) {
-          targetX = -X_MARKS_SPOT;
-          targetY = 0;
-          targetAZ = 0;
+        if(ballsInGoal.size() == 3){
+          this_thread::sleep_for(1000);
         } else {
-          targetX = X_MARKS_SPOT;
-          targetY = 0;
-          targetAZ = 0;
+          this_thread::sleep_for(400);
         }
-        phase++;
-      } case 5: { // drive to goal
-        double angle;
-        if(drivePhase == 1 || drivePhase == 2)
-          angle = tank.angleBetween(local_map.pos.x, local_map.pos.y, targetX, targetY);
-        else
-          angle = targetAZ; // target location
-        
-        if(drive(local_map, targetX, targetY, angle)){
-          drivePhase = 1; phase++;
-        }
-
-        break;
-      } case 6: { // spit out ball
-
-        tank.drive(50, 0);
-        this_thread::sleep_for(500);
-        tank.drive(0, 0);
-
-        ballStor.intake(-50);
-
-        this_thread::sleep_for(500);
-
         ballStor.intake(0);
-        tank.drive(-50, 0);
+        ballStor.shoot(100);
 
-        this_thread::sleep_for(1000);
+        this_thread::sleep_for(2000);
+        ballStor.shoot(0);
 
-        tank.drive(0, 0);
-        break;
+        this_thread::sleep_for(500);
+        tank.driveTime(1250, -50);
+      } else {
+        tank.driveTime(2000, 50);
+        ballStor.intake(100);
+        if(ballsInGoal.size() == 3){
+          this_thread::sleep_for(1000);
+        } else {
+          this_thread::sleep_for(400);
+        }
+        ballStor.intake(0);
+
+
+        tank.driveTime(1250, -50);
+        tank.rotate(90);
+        ballStor.intake(-100);
+        this_thread::sleep_for(500);
+        ballStor.intake(0);
+        tank.rotate(-90);
+      }
+      ballsInGoal.clear();
+      for(fifo_object_box each: local_map.boxobj){
+        if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+          ballsInGoal.push_back(each);
+        }
       }
     }
 
-    this_thread::sleep_for(loop_time);
+    tank.drive(-24);
   }
 }
 
@@ -211,12 +187,113 @@ void play(bool isolation) {
 // }
 
 void auto_Isolation(void) {
-  tank.drive(50, 0);
-  
-  this_thread::sleep_for(1000);
+  //tank.drive(20);
 
-  tank.drive(0, 0);
-  play(true);
+  if (TEAM_COLOR == 0){
+    // Red: Manager on top
+    if (manager_robot){
+      tank.drive(-50);
+      tank.rotate(-45);
+      tank.drive(28);
+      tank.drive(500, 100);
+      score();
+
+      tank.drive(-30);
+      tank.rotate(58);
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, -GOAL_CONST, GOAL_CONST));
+      ballStor.intake(100);
+      tank.drive(60);
+      
+      ballStor.intake(0);
+      tank.drive(500, 100);
+      score();
+      //tank.rotate(-tank.az);
+      //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
+
+      //drive to (-36, 36)
+      //tank.drive(dist(tank.x, tank.y, -36, 36));
+      tank.drive(24);
+      tank.rotate(315);
+      tank.drive(-20);
+      //now we're there, turn toward ball/goal at top left
+      tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
+
+      //drive to the bottom right corner of the top left square
+      tank.drive(dist(tank.x, tank.y, -48, 48));
+
+      //intake the ball there
+      intake();
+
+      //move a little forward, then score
+      tank.drive(2);
+      score();
+      tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
+tank.drive(dist(tank.x, tank.y, 0, 36));
+intake();
+ tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
+tank.drive(dist(tank.x, tank.y, 0, 0));
+score();
+    // Red: worker on Bottom
+    } else {
+      // Deposit ball
+      score();
+    }
+  }
+  // Blue
+  else if (TEAM_COLOR == 1){
+    // Blue: Manager (on bottom)
+    if (manager_robot){
+      tank.drive(-50);
+      tank.rotate(-45);
+      tank.drive(28);
+      tank.drive(500, 100);
+      score();
+
+      tank.drive(-30);
+      tank.rotate(58);
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, GOAL_CONST, -GOAL_CONST));
+      ballStor.intake(100);
+      tank.drive(60);
+      
+      ballStor.intake(0);
+      tank.drive(500, 100);
+      score();
+      //tank.rotate(-tank.az);
+      //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
+
+      //drive to (-36, 36)
+      //tank.drive(dist(tank.x, tank.y, -36, 36));
+      tank.drive(24);
+      tank.rotate(315);
+      tank.drive(-20);
+      //now we're there, turn toward ball/goal at top left
+      tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
+
+      //drive to the bottom right corner of the top left square
+      tank.drive(dist(tank.x, tank.y, -48, 48));
+
+      //intake the ball there
+      intake();
+
+      //move a little forward, then score
+      tank.drive(2);
+      score();
+      tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
+tank.drive(dist(tank.x, tank.y, 0, 36));
+intake();
+ tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
+tank.drive(dist(tank.x, tank.y, 0, 0));
+score();
+    // Red: worker on Bottom
+    } else {
+      // Deposit ball
+      score();
+    }
+  }
 }
 
 void auto_Interaction(void) {
@@ -246,29 +323,47 @@ void autonomousMain(void) {
 //
 int main() {
   vexcodeInit();
-
-  // thread t1(dashboardTask);
-  // Competition.autonomous(autonomousMain);
+  thread t1(dashboardTask);
+  Competition.autonomous(autonomousMain);
+  float lastX = 0;
+  float lastY = 0;
+  float lastAz = 0;
   // linkA.received("demoMessage", receiveDemo);
-  
   // Prevent main from exiting with an infinite loop.
   // print through the controller to the terminal (vexos 1.0.12 is needed)
     // As USB is tied up with Jetson communications we cannot use
     // printf for debug.  If the controller is connected
     // then this can be used as a direct connection to USB on the controller
     // when using VEXcode.
-    //
-
     while(1) {
         // get last map data
+        // fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az);
         jetson_comms.get_data( &local_map );
-
         // set our location to be sent to partner robot
         // link.set_remote_location( local_map.pos.x, local_map.pos.y, local_map.pos.az );
-
         // request new data    
         // NOTE: This request should only happen in a single task.    
         jetson_comms.request_map();
+
+        // fprintf(fp, "ROBOT LOCATION: " );
+        // fprintf(fp, "%.2f %.2f %.2f\n", local_map.pos.x, local_map.pos.y, local_map.pos.az);
+        // fprintf(fp, "MAP OBJECTS: \n");
+        // for(MAP_OBJECTS each: local_map.mapobj){
+        //   fprintf(fp, "%ld %ld %.2f %.2f %.2f\n", each.age, each.classID, each.positionX/25.4, each.positionY/25.4, each.positionZ);
+        // }
+        // fprintf(fp, "\n");
+
+        // Update the current position, if it has changed
+        if(local_map.pos.x != lastX || local_map.pos.y != lastY || local_map.pos.az != lastAz){
+          tank.x = local_map.pos.x;
+          tank.y = local_map.pos.y;
+          tank.az = local_map.pos.az;
+          while(tank.az < 0)
+            tank.az += 360;
+          lastX = local_map.pos.x;
+          lastY = local_map.pos.y;
+          lastAz = local_map.pos.az;
+        }
 
         // Allow other tasks to run
         this_thread::sleep_for(loop_time);

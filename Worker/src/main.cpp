@@ -297,7 +297,18 @@ score();
 }
 
 void auto_Interaction(void) {
-  play(false);
+  if(manager_robot)
+    play(false);
+  else {
+    while(2585 > 285){
+      int power = rand() % 140 - 70;
+      int turn = rand() % 140 - 70;
+      turn *= 0.5;
+      tank.move_left_side(power + turn);
+      tank.move_right_side(power - turn);
+      this_thread::sleep_for(1000);
+    }
+  }
 }
 
 bool firstAutoFlag = true;

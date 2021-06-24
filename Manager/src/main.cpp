@@ -63,12 +63,12 @@ int play(bool isolation) {
   int curGoal = -1;
   tuple<float, float> goals[6];
   if(TEAM_COLOR == 0){
-    tuple<float, float> g [] = {tuple<float, float>(-1,1), tuple<float, float>(-1, 0), tuple<float, float>(0,1), tuple<float, float>(0, 0), tuple<float, float>(1,1), tuple<float, float>(1, 0)};
+    tuple<float, float> g [] = {tuple<float, float>(0,0), tuple<float, float>(0, 1), tuple<float, float>(1,1), tuple<float, float>(1, 0), tuple<float, float>(1, -1), tuple<float, float>(0, -1)};
     for(int i = 0; i < 6; i++){
       goals[i] = g[i];
     }
   } else {
-    tuple<float, float> g [] = {tuple<float, float>(-1,-1), tuple<float, float>(-1, 0), tuple<float, float>(0,-1), tuple<float, float>(0, 0), tuple<float, float>(1,-1), tuple<float, float>(1, 0)};
+    tuple<float, float> g [] = {tuple<float, float>(0, 0), tuple<float, float>(0, -1), tuple<float, float>(-1, -1), tuple<float, float>(-1, 0), tuple<float, float>(-1,1), tuple<float, float>(0, 1)};
     for(int i = 0; i < 6; i++){
       goals[i] = g[i];
     }
@@ -192,19 +192,18 @@ void auto_Isolation(void) {
   if (TEAM_COLOR == 0){
     // Red: Manager on top
     if (manager_robot){
-      //score ball that was input
-      //tank.drive(8);
       tank.drive(-50);
       tank.rotate(-45);
       tank.drive(28);
       tank.drive(500, 100);
       score();
 
-      //turn toward (-36, 36)
       tank.drive(-30);
       tank.rotate(58);
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, -GOAL_CONST, GOAL_CONST));
       ballStor.intake(100);
       tank.drive(60);
+      
       ballStor.intake(0);
       tank.drive(500, 100);
       score();
@@ -246,27 +245,50 @@ score();
   else if (TEAM_COLOR == 1){
     // Blue: Manager (on bottom)
     if (manager_robot){
-      // Drive to middle right goal
-      
-      
-      // Deposit ball
+      tank.drive(-50);
+      tank.rotate(-45);
+      tank.drive(28);
+      tank.drive(500, 100);
       score();
 
-      ballStor.intake(50);
-      // Move towards bottom right goal and intake ball
-      
-      
-      score();
-      // Turn towards center ball on midline
-
-      ballStor.intake(50);
+      tank.drive(-30);
+      tank.rotate(58);
+      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, GOAL_CONST, -GOAL_CONST));
+      ballStor.intake(100);
+      tank.drive(60);
       
       ballStor.intake(0);
-
-      intake();
-      // Turn towards middle goal
-
+      tank.drive(500, 100);
       score();
+      //tank.rotate(-tank.az);
+      //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
+
+      //drive to (-36, 36)
+      //tank.drive(dist(tank.x, tank.y, -36, 36));
+      tank.drive(24);
+      tank.rotate(315);
+      tank.drive(-20);
+      //now we're there, turn toward ball/goal at top left
+      tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
+
+      //drive to the bottom right corner of the top left square
+      tank.drive(dist(tank.x, tank.y, -48, 48));
+
+      //intake the ball there
+      intake();
+
+      //move a little forward, then score
+      tank.drive(2);
+      score();
+      tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
+tank.drive(dist(tank.x, tank.y, 0, 36));
+intake();
+ tank.rotate(-tank.az);
+tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
+tank.drive(dist(tank.x, tank.y, 0, 0));
+score();
+    // Red: worker on Bottom
     } else {
       // Deposit ball
       score();
@@ -288,10 +310,10 @@ void autonomousMain(void) {
   // and we will enter the interaction period. 
   // ..........................................................................
 
-  // if(firstAutoFlag)
+  if(firstAutoFlag)
     auto_Isolation();
-  // else 
-    // auto_Interaction();
+  else 
+    auto_Interaction();
 
   firstAutoFlag = false;
 }

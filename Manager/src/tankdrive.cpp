@@ -15,6 +15,8 @@ using namespace std;
 
 #define moveConst 21
 #define rotateConst 2.375
+#define timeConst 200
+#define timeRotConst 20
 
 FILE *fpp = fopen("/dev/serial2","wb");
 
@@ -96,7 +98,11 @@ void tankDrive::drive(double dist){ // distance is in inches
   x += dist * sin(az * PI/180);
   y += dist * cos(az * PI/180);
   left_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, false);
-  right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, true);
+  right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, false);
+  this_thread::sleep_for(dist * timeConst);
+  
+  left_drive.spin(directionType::fwd, 0, percentUnits::pct);
+  right_drive.spin(directionType::fwd, 0, percentUnits::pct);
 }
 
 void tankDrive::rotate(double angle){ // distance is in inches
@@ -111,8 +117,11 @@ void tankDrive::rotate(double angle){ // distance is in inches
   while(az < 0)
     az += 360;
   left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, false);
-  right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, true);
-  this_thread::sleep_for(1000);
+  right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, false);
+  this_thread::sleep_for(timeRotConst * angle);
+
+  left_drive.spin(directionType::fwd, 0, percentUnits::pct);
+  right_drive.spin(directionType::fwd, 0, percentUnits::pct);
 }
 
 tuple<pair<double, double>, double> tankDrive::closestJoinHighway(double x, double y){

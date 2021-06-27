@@ -62,7 +62,7 @@ int play(bool isolation) {
   int curGoal = -1;
   tuple<float, float> goals[6];
   if(TEAM_COLOR == 1){
-    tuple<float, float> g [] = {tuple<float, float>(1, 1), tuple<float, float>(0, 1), tuple<float, float>(0, 0), tuple<float, float>(1, 0), tuple<float, float>(1, -1), tuple<float, float>(0, -1)};
+    tuple<float, float> g [] = {tuple<float, float>(0,0), tuple<float, float>(0, 1), tuple<float, float>(1,1), tuple<float, float>(1, 0), tuple<float, float>(1, -1), tuple<float, float>(0, -1)};
     for(int i = 0; i < 6; i++){
       goals[i] = g[i];
     }
@@ -112,23 +112,23 @@ int play(bool isolation) {
       }
     }
     
-    // vector<fifo_object_box> ballsInGoal;
-    // for(fifo_object_box each: local_map.boxobj){
-    //   if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
-    //     ballsInGoal.push_back(each);
-    //   }
-    // }
-    // fprintf(fp, "Now detecting objects...\n");
-    // for(fifo_object_box each: ballsInGoal){
-    //   fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
-    // }
-    // bool flag = false;
-    // while(ballsInGoal.size() > 0){
-      // if(ballsInGoal.front().classID == TEAM_COLOR){
-      //   fprintf(fp, "This goal is already scored. Moving on...\n");
-      //   break;
-      // }
-      // flag = true;
+    vector<fifo_object_box> ballsInGoal;
+    for(fifo_object_box each: local_map.boxobj){
+      if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+        ballsInGoal.push_back(each);
+      }
+    }
+    fprintf(fp, "Now detecting objects...\n");
+    for(fifo_object_box each: ballsInGoal){
+      fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
+    }
+    bool flag = false;
+    while(ballsInGoal.size() > 0){
+      if(ballsInGoal.front().classID == TEAM_COLOR){
+        fprintf(fp, "This goal is already scored. Moving on...\n");
+        break;
+      }
+      flag = true;
 
       // while(abs(ballsInGoal[0].x - 150) > 20){
       //   fprintf(fp, "Re-centering on goal using Intel. Goal currently in position %d and should be at 150.\n", ballsInGoal[0].x);
@@ -146,39 +146,39 @@ int play(bool isolation) {
       //   }
       // }
 
-      // sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-      // fprintf(fp, "Sorting objects by height...\n");
-      // for(fifo_object_box each: ballsInGoal){
-      //   fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
-      // }
+      sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
+      fprintf(fp, "Sorting objects by height...\n");
+      for(fifo_object_box each: ballsInGoal){
+        fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
+      }
 
-      // if(ballsInGoal.back().classID == TEAM_COLOR){
-      //   fprintf(fp, "Initiating scoring sequence\n");
-      //   tank.driveTime(2000, 50);
-      //   ballStor.intake(100);
+      if(ballsInGoal.back().classID == TEAM_COLOR){
+        fprintf(fp, "Initiating scoring sequence\n");
+        tank.driveTime(2000, 50);
+        ballStor.intake(100);
 
-      //   if(ballsInGoal.size() == 3){
-      //     this_thread::sleep_for(1000);
-      //   } else {
-      //     this_thread::sleep_for(400);
-      //   }
-      //   ballStor.intake(0);
-      //   ballStor.shoot(100);
+        if(ballsInGoal.size() == 3){
+          this_thread::sleep_for(1000);
+        } else {
+          this_thread::sleep_for(400);
+        }
+        ballStor.intake(0);
+        ballStor.shoot(100);
 
-      //   this_thread::sleep_for(2000);
-      //   ballStor.shoot(0);
+        this_thread::sleep_for(2000);
+        ballStor.shoot(0);
 
-      //   this_thread::sleep_for(500);
-      //   tank.driveTime(1250, -50);
-      // } else {
+        this_thread::sleep_for(500);
+        tank.driveTime(1250, -50);
+      } else {
         fprintf(fp, "Initiating descoring sequence\n");
         tank.driveTime(2000, 50);
         ballStor.intake(100);
-        // if(ballsInGoal.size() == 3){
-        //   this_thread::sleep_for(1000);
-        // } else {
-          this_thread::sleep_for(5000);
-        // }
+        if(ballsInGoal.size() == 3){
+          this_thread::sleep_for(1000);
+        } else {
+          this_thread::sleep_for(400);
+        }
         ballStor.intake(0);
 
         tank.driveTime(1250, -50);
@@ -188,22 +188,22 @@ int play(bool isolation) {
         ballStor.intake(0);
         tank.rotate(-90);
       }
-  //     ballsInGoal.clear();
-  //     for(fifo_object_box each: local_map.boxobj){
-  //       if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
-  //         ballsInGoal.push_back(each);
-  //       }
-  //     }
-  //     fprintf(fp, "Now detecting objects...\n");
-  //     for(fifo_object_box each: ballsInGoal){
-  //       fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
-  //     }
-  //   }
+      ballsInGoal.clear();
+      for(fifo_object_box each: local_map.boxobj){
+        if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+          ballsInGoal.push_back(each);
+        }
+      }
+      fprintf(fp, "Now detecting objects...\n");
+      for(fifo_object_box each: ballsInGoal){
+        fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
+      }
+    }
 
-  //   fprintf(fp, "There are no more balls in this goal/goal is already scored. Moving on...\n");
-  //   if(flag)
-  //     tank.drive(-24);
-  // }
+    fprintf(fp, "There are no more balls in this goal/goal is already scored. Moving on...\n");
+    if(flag)
+      tank.drive(-24);
+  }
 }
 
 // // Demo message sender in message_link
@@ -342,6 +342,7 @@ void auto_Isolation(void) {
       ballStor.intake(0);
       tank.drive(24);
       score();
+      tank.drive(-18);
       //tank.rotate(-tank.az);
       //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
 
@@ -379,9 +380,8 @@ void auto_Isolation(void) {
 }
 
 void auto_Interaction(void) {
-  tank.drive(-10);
   tank.rotate(135);
-  tank.driveTime(1500, 100);
+  tank.driveTime(5000, 50);
   play(false);
 }
 

@@ -15,8 +15,8 @@ using namespace std;
 
 #define moveConst 21
 #define rotateConst 2.375
-#define timeConst 200
-#define timeRotConst 20
+#define timeConst 100
+#define timeRotConst 10
 
 FILE *fpp = fopen("/dev/serial2","wb");
 
@@ -99,8 +99,12 @@ void tankDrive::drive(double dist){ // distance is in inches
   y += dist * cos(az * PI/180);
   left_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, false);
   right_drive.spinFor(directionType::fwd, dist * moveConst, rotationUnits::deg, false);
-  this_thread::sleep_for(dist * timeConst);
-  
+  this_thread::sleep_for(abs(dist) * timeConst);
+
+  // if(abs(left_drive.position(rotationUnits::deg) - (oldPos + dist * moveConst)) > 20){
+  //   left_drive.spinFor(directionType::fwd, -6, rotationUnits::deg, false);
+  //   right_drive.spinFor(directionType::fwd, -6, rotationUnits::deg, true);
+  // }
   left_drive.spin(directionType::fwd, 0, percentUnits::pct);
   right_drive.spin(directionType::fwd, 0, percentUnits::pct);
 }
@@ -116,9 +120,10 @@ void tankDrive::rotate(double angle){ // distance is in inches
     az -= 360;
   while(az < 0)
     az += 360;
+  fprintf(fpp, "Re-turning to target location: turning %f degrees.\n", angle);
   left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, false);
   right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, false);
-  this_thread::sleep_for(timeRotConst * angle);
+  this_thread::sleep_for(timeRotConst * abs(angle));
 
   left_drive.spin(directionType::fwd, 0, percentUnits::pct);
   right_drive.spin(directionType::fwd, 0, percentUnits::pct);
@@ -208,6 +213,5 @@ double tankDrive::angleBetween(double x, double y, double tX, double tY){
   }
   if(angle < 0)
     angle += 360;
-  fprintf(fpp, "ANGLE2: %f\n", angle);
   return angle;
 }

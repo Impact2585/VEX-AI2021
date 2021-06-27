@@ -117,7 +117,7 @@ void tankDrive::rotate(double angle){ // distance is in inches
   while(az < 0)
     az += 360;
   left_drive.spinFor(directionType::fwd, angle * rotateConst, rotationUnits::deg, false);
-  right_drive.spinFor(directionType::rev, angle * rotateConst, rotationUnits::deg, false);
+  right_drive.spinFor(directionType::fwd, -angle * rotateConst, rotationUnits::deg, false);
   this_thread::sleep_for(timeRotConst * angle);
 
   left_drive.spin(directionType::fwd, 0, percentUnits::pct);

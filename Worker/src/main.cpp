@@ -300,6 +300,14 @@ void auto_Interaction(void) {
   if(manager_robot)
     play(false);
   else {
+    
+    tank.move_left_side(25);
+    tank.move_right_side(-25);
+    this_thread::sleep_for(500);
+
+    tank.move_left_side(25);
+    tank.move_right_side(25);
+    this_thread::sleep_for(8000);
     while(2585 > 285){
       int power = rand() % 140 - 70;
       int turn = rand() % 140 - 70;

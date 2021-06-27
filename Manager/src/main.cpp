@@ -12,10 +12,9 @@ using namespace std;
 #define STOP_BEFORE 48.0
 #define GOAL_CONST 72.0
 
-// 0 is red team, 1 is blue team. Change the program run during competition for rounds. 1 = red team, 2 = blue team
-#define TEAM_COLOR 0
-// This is the manager robot. THE MANAGER ROBOT IS  PLACED TO THE NORTH OF THE WORKER ROBOT 
-// ON THE RED TEAM, AND SOUTH OF THE WORKER ROBOT ON THE BLUE TEAM.
+// 0 is red team, 1 is blue team. Change the program run during competition for rounds.
+#define TEAM_COLOR 1
+// This is the manager robot. 
 #define manager_robot true
 #define loop_time 66
 
@@ -62,8 +61,8 @@ void intake(){
 int play(bool isolation) {
   int curGoal = -1;
   tuple<float, float> goals[6];
-  if(TEAM_COLOR == 0){
-    tuple<float, float> g [] = {tuple<float, float>(0,0), tuple<float, float>(0, 1), tuple<float, float>(1,1), tuple<float, float>(1, 0), tuple<float, float>(1, -1), tuple<float, float>(0, -1)};
+  if(TEAM_COLOR == 1){
+    tuple<float, float> g [] = {tuple<float, float>(1, 1), tuple<float, float>(0, 1), tuple<float, float>(0, 0), tuple<float, float>(1, 0), tuple<float, float>(1, -1), tuple<float, float>(0, -1)};
     for(int i = 0; i < 6; i++){
       goals[i] = g[i];
     }
@@ -75,78 +74,112 @@ int play(bool isolation) {
   }
 
   while(2585 > 285){
-    this_thread::sleep_for(2000);
     curGoal++;
     if(curGoal >= sizeof(goals)/sizeof(goals[0]))
       curGoal = 0;
     double targetX = GOAL_CONST * get<0>(goals[curGoal]);
     double targetY = GOAL_CONST * get<1>(goals[curGoal]);
-    double targetAZ;
-    if(curGoal % 2 == 0)
-      targetAZ = 0;
-    else
-      targetAZ = 180;
+    fprintf(fp, "TARGETING: %f %f\n", targetX, targetY);
 
+    turn1:
+    fprintf(fp, "Currently at: %f , %f and facing %f degrees. Destination: %f %f facing %f degrees.\n", tank.x, tank.y, tank.az, targetX, targetY, tank.angleBetween(tank.x, tank.y, targetX, targetY));
+    tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+    this_thread::sleep_for(750);
+    float error = abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+    while(error > 180)
+      error -= 360;
+    error = abs(error);
+    if(error > 10){
+      fprintf(fp, "I am still %f degrees off from the target location! Retargeting...\n", error);
+      goto turn1;
+    }
     while(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE > 12){
-      turn:
-      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
-      fprintf(fp, "2: %f %f %f %f %f %f\n", tank.x, tank.y, tank.az, targetX, targetY, tank.angleBetween(tank.x, tank.y, targetX, targetY));
-      // Drive to scoring position
-      if(abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY)) > 10)
-        goto turn;
       drive:
+      fprintf(fp, "Now driving towards the destination\n");
       float d = min(dist(tank.x, tank.y, targetX, targetY) - STOP_BEFORE, 36.0);
       tank.drive(d);
-    }
-    turn2:
-    tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
-    if(abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY)) > 8)
-        goto turn2;
-
-    vector<fifo_object_box> ballsInGoal;
-    for(fifo_object_box each: local_map.boxobj){
-      if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
-        ballsInGoal.push_back(each);
-      }
-    }
-    while(ballsInGoal.size() > 0){
-      sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
-      for(fifo_object_box each: ballsInGoal){
-        fprintf(fp, "%d %d %d\n" , each.x, each.y, each.classID);
-      }
-
-      if(ballsInGoal.front().classID == TEAM_COLOR)
-        break;
-
+      turn:
+      fprintf(fp, "Currently at: %f , %f and facing %f degrees. Destination: %f %f facing %f degrees.\n", tank.x, tank.y, tank.az, targetX, targetY, tank.angleBetween(tank.x, tank.y, targetX, targetY));
       tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      this_thread::sleep_for(750);
+      float error = abs(-tank.az + tank.angleBetween(tank.x, tank.y, targetX, targetY));
+      while(error > 180)
+        error -= 360;
+      error = abs(error);
+      if(error > 10){
+        fprintf(fp, "I am still %f degrees off from the target location! Retargeting...\n", error);
+        goto turn;
+      }
+    }
+    
+    // vector<fifo_object_box> ballsInGoal;
+    // for(fifo_object_box each: local_map.boxobj){
+    //   if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+    //     ballsInGoal.push_back(each);
+    //   }
+    // }
+    // fprintf(fp, "Now detecting objects...\n");
+    // for(fifo_object_box each: ballsInGoal){
+    //   fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
+    // }
+    // bool flag = false;
+    // while(ballsInGoal.size() > 0){
+      // if(ballsInGoal.front().classID == TEAM_COLOR){
+      //   fprintf(fp, "This goal is already scored. Moving on...\n");
+      //   break;
+      // }
+      // flag = true;
 
-      if(ballsInGoal.back().classID == TEAM_COLOR){
+      // while(abs(ballsInGoal[0].x - 150) > 20){
+      //   fprintf(fp, "Re-centering on goal using Intel. Goal currently in position %d and should be at 150.\n", ballsInGoal[0].x);
+      //   if(ballsInGoal[0].x > 150){
+      //     tank.drive(0, 25);
+      //   } else {
+      //     tank.drive(0, -25);
+      //   }
+      //   this_thread::sleep_for(500);
+      //   ballsInGoal.clear();
+      //   for(fifo_object_box each: local_map.boxobj){
+      //     if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+      //       ballsInGoal.push_back(each);
+      //     }
+      //   }
+      // }
+
+      // sort(ballsInGoal.begin(), ballsInGoal.end(), orderByHeight);
+      // fprintf(fp, "Sorting objects by height...\n");
+      // for(fifo_object_box each: ballsInGoal){
+      //   fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
+      // }
+
+      // if(ballsInGoal.back().classID == TEAM_COLOR){
+      //   fprintf(fp, "Initiating scoring sequence\n");
+      //   tank.driveTime(2000, 50);
+      //   ballStor.intake(100);
+
+      //   if(ballsInGoal.size() == 3){
+      //     this_thread::sleep_for(1000);
+      //   } else {
+      //     this_thread::sleep_for(400);
+      //   }
+      //   ballStor.intake(0);
+      //   ballStor.shoot(100);
+
+      //   this_thread::sleep_for(2000);
+      //   ballStor.shoot(0);
+
+      //   this_thread::sleep_for(500);
+      //   tank.driveTime(1250, -50);
+      // } else {
+        fprintf(fp, "Initiating descoring sequence\n");
         tank.driveTime(2000, 50);
         ballStor.intake(100);
-
-        if(ballsInGoal.size() == 3){
-          this_thread::sleep_for(1000);
-        } else {
-          this_thread::sleep_for(400);
-        }
+        // if(ballsInGoal.size() == 3){
+        //   this_thread::sleep_for(1000);
+        // } else {
+          this_thread::sleep_for(5000);
+        // }
         ballStor.intake(0);
-        ballStor.shoot(100);
-
-        this_thread::sleep_for(2000);
-        ballStor.shoot(0);
-
-        this_thread::sleep_for(500);
-        tank.driveTime(1250, -50);
-      } else {
-        tank.driveTime(2000, 50);
-        ballStor.intake(100);
-        if(ballsInGoal.size() == 3){
-          this_thread::sleep_for(1000);
-        } else {
-          this_thread::sleep_for(400);
-        }
-        ballStor.intake(0);
-
 
         tank.driveTime(1250, -50);
         tank.rotate(90);
@@ -155,16 +188,22 @@ int play(bool isolation) {
         ballStor.intake(0);
         tank.rotate(-90);
       }
-      ballsInGoal.clear();
-      for(fifo_object_box each: local_map.boxobj){
-        if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
-          ballsInGoal.push_back(each);
-        }
-      }
-    }
+  //     ballsInGoal.clear();
+  //     for(fifo_object_box each: local_map.boxobj){
+  //       if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+  //         ballsInGoal.push_back(each);
+  //       }
+  //     }
+  //     fprintf(fp, "Now detecting objects...\n");
+  //     for(fifo_object_box each: ballsInGoal){
+  //       fprintf(fp, "X: %d Y: %d ID: %d\n" , each.x, each.y, each.classID);
+  //     }
+  //   }
 
-    tank.drive(-24);
-  }
+  //   fprintf(fp, "There are no more balls in this goal/goal is already scored. Moving on...\n");
+  //   if(flag)
+  //     tank.drive(-24);
+  // }
 }
 
 // // Demo message sender in message_link
@@ -192,51 +231,73 @@ void auto_Isolation(void) {
   if (TEAM_COLOR == 0){
     // Red: Manager on top
     if (manager_robot){
+      fprintf(fp, "Running RED, MANAGER autonomous sequence\n");
       tank.drive(-50);
       tank.rotate(-45);
-      tank.drive(28);
-      tank.drive(500, 100);
+      tank.drive(35);
       score();
 
-      tank.drive(-30);
-      tank.rotate(58);
-      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, -GOAL_CONST, GOAL_CONST));
+      tank.drive(-24);
+      tank.rotate(65);
+      // fifo_object_box ball;
+      // for(fifo_object_box each: local_map.boxobj){
+      //   if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+      //     ball = each;
+      //     break;
+      //   }
+      // }
+      // while(abs(ball.x - 150) > 20){
+      //   fprintf(fp, "Re-centering on goal using Intel. Goal currently in position %d and should be at 150.\n", ball.x);
+      //   if(ball.x > 150){
+      //     tank.drive(0, 25);
+      //   } else {
+      //     tank.drive(0, -25);
+      //   }
+      //   this_thread::sleep_for(500);
+      //   for(fifo_object_box each: local_map.boxobj){
+      //     if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+      //       ball = each;
+      //       break;
+      //     }
+      //   }
+      // }
       ballStor.intake(100);
       tank.drive(60);
       
       ballStor.intake(0);
-      tank.drive(500, 100);
+      tank.drive(24);
       score();
+      tank.drive(-24);
       //tank.rotate(-tank.az);
       //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
 
       //drive to (-36, 36)
       //tank.drive(dist(tank.x, tank.y, -36, 36));
-      tank.drive(24);
-      tank.rotate(315);
-      tank.drive(-20);
-      //now we're there, turn toward ball/goal at top left
-      tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
+//       tank.drive(24);
+//       tank.rotate(315);
+//       tank.drive(-20);
+//       //now we're there, turn toward ball/goal at top left
 
-      //drive to the bottom right corner of the top left square
-      tank.drive(dist(tank.x, tank.y, -48, 48));
+//       //drive to the bottom right corner of the top left square
+//       tank.drive(dist(tank.x, tank.y, -48, 48));
 
-      //intake the ball there
-      intake();
+//       //intake the ball there
+//       intake();
 
-      //move a little forward, then score
-      tank.drive(2);
-      score();
-      tank.rotate(-tank.az);
-tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
-tank.drive(dist(tank.x, tank.y, 0, 36));
-intake();
- tank.rotate(-tank.az);
-tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
-tank.drive(dist(tank.x, tank.y, 0, 0));
-score();
+//       //move a little forward, then score
+//       tank.drive(2);
+//       score();
+//       tank.rotate(-tank.az);
+// tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
+// tank.drive(dist(tank.x, tank.y, 0, 36));
+// intake();
+//  tank.rotate(-tank.az);
+// tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
+// tank.drive(dist(tank.x, tank.y, 0, 0));
+// score();
     // Red: worker on Bottom
     } else {
+      fprintf(fp, "Running RED, WORKER autonomous sequence\n");
       // Deposit ball
       score();
     }
@@ -245,51 +306,72 @@ score();
   else if (TEAM_COLOR == 1){
     // Blue: Manager (on bottom)
     if (manager_robot){
+      fprintf(fp, "Running BLUE, MANAGER autonomous sequence\n");
       tank.drive(-50);
       tank.rotate(-45);
-      tank.drive(28);
-      tank.drive(500, 100);
+      tank.drive(35);
       score();
 
-      tank.drive(-30);
-      tank.rotate(58);
-      tank.rotate(-tank.az + tank.angleBetween(tank.x, tank.y, GOAL_CONST, -GOAL_CONST));
+      tank.drive(-24);
+      tank.rotate(65);
+      // fifo_object_box ball;
+      // for(fifo_object_box each: local_map.boxobj){
+      //   if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+      //     ball = each;
+      //     break;
+      //   }
+      // }
+      // while(abs(ball.x - 150) > 20){
+      //   fprintf(fp, "Re-centering on goal using Intel. Goal currently in position %d and should be at 150.\n", ball.x);
+      //   if(ball.x > 150){
+      //     tank.drive(0, 25);
+      //   } else {
+      //     tank.drive(0, -25);
+      //   }
+      //   this_thread::sleep_for(500);
+      //   for(fifo_object_box each: local_map.boxobj){
+      //     if(each.classID != 2 && (each.x != 0.0 || each.y != 0.0)){
+      //       ball = each;
+      //       break;
+      //     }
+      //   }
+      // }
       ballStor.intake(100);
       tank.drive(60);
       
       ballStor.intake(0);
-      tank.drive(500, 100);
+      tank.drive(24);
       score();
       //tank.rotate(-tank.az);
       //tank.rotate(tank.angleBetween(tank.x, tank.y, -36, 36));
 
       //drive to (-36, 36)
       //tank.drive(dist(tank.x, tank.y, -36, 36));
-      tank.drive(24);
-      tank.rotate(315);
-      tank.drive(-20);
-      //now we're there, turn toward ball/goal at top left
-      tank.rotate(tank.angleBetween(tank.x, tank.y, -72, 72));
+//       tank.drive(24);
+//       tank.rotate(315);
+//       tank.drive(-20);
+//       //now we're there, turn toward ball/goal at top left
 
-      //drive to the bottom right corner of the top left square
-      tank.drive(dist(tank.x, tank.y, -48, 48));
+//       //drive to the bottom right corner of the top left square
+//       tank.drive(dist(tank.x, tank.y, -48, 48));
 
-      //intake the ball there
-      intake();
+//       //intake the ball there
+//       intake();
 
-      //move a little forward, then score
-      tank.drive(2);
-      score();
-      tank.rotate(-tank.az);
-tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
-tank.drive(dist(tank.x, tank.y, 0, 36));
-intake();
- tank.rotate(-tank.az);
-tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
-tank.drive(dist(tank.x, tank.y, 0, 0));
-score();
+//       //move a little forward, then score
+//       tank.drive(2);
+//       score();
+//       tank.rotate(-tank.az);
+// tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 36));
+// tank.drive(dist(tank.x, tank.y, 0, 36));
+// intake();
+//  tank.rotate(-tank.az);
+// tank.rotate(tank.angleBetween(tank.x, tank.y, 0, 0));
+// tank.drive(dist(tank.x, tank.y, 0, 0));
+// score();
     // Red: worker on Bottom
     } else {
+      fprintf(fp, "Running BLUE, WORKER autonomous sequence\n");
       // Deposit ball
       score();
     }
@@ -297,6 +379,9 @@ score();
 }
 
 void auto_Interaction(void) {
+  tank.drive(-10);
+  tank.rotate(135);
+  tank.driveTime(1500, 100);
   play(false);
 }
 
@@ -310,7 +395,7 @@ void autonomousMain(void) {
   // and we will enter the interaction period. 
   // ..........................................................................
 
-  if(firstAutoFlag)
+if(firstAutoFlag)
     auto_Isolation();
   else 
     auto_Interaction();
